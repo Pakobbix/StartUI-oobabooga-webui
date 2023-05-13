@@ -29,15 +29,20 @@ if platform.system() == 'Linux':
     conda_env_path = "./installer_files/env"
 
 def run_cmd_with_conda(cmd, env=None):
-    # Activate conda environment
-    activate_cmd = f"{conda_binary} activate {conda_env_path} && "
-    full_cmd = activate_cmd + cmd
-
-    # Open a separate terminal window and execute the command for windows or Linux (uses Gnome Terminal atm)
     if platform.system() == 'Windows':
+        # For Windows, activate the Conda environment using the activate.bat script
+        activate_cmd = f"{conda_binary} activate {conda_env_path} && "
+        full_cmd = activate_cmd + cmd
+
+        # Open a separate terminal window and execute the command
         subprocess.Popen(['start', 'cmd', '/k', full_cmd], shell=True, env=env)
     elif platform.system() == 'Linux':
-        subprocess.Popen(['gnome-terminal', '--', 'bash', '-c', full_cmd], env=env)
+        # For Linux, activate the Conda environment using the conda command
+        activate_cmd = f"conda activate {conda_env_path} && "
+        full_cmd = f"source ./installer_files/conda/etc/profile.d/conda.sh && conda run -p {conda_env_path} {cmd}"
+
+        # Open a separate terminal window and execute the command
+        process = subprocess.Popen(['gnome-terminal', '--', 'bash', '-c', full_cmd], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
 class MainWindow(QMainWindow):
