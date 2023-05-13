@@ -7,18 +7,20 @@ As someone who isn't a professional programmer, I enjoy experimenting and findin
 WebUI StartGUI is a Python graphical user interface (GUI) written with PyQT5, that allows users to configure settings and start the oobabooga web user interface (WebUI). It provides a convenient way to adjust various parameters and launch the WebUI with the desired settings.
 
 ## Current Features
-- Select a model from a dropdown menu
+- Select a model from a dropdown menu (with reload button if added while the StartUI is open)
 - Choose wbits and groupsize options
 - Select the operating mode (chat, cai-chat, notebook)
-- Enable/disable GPU usage and set GPU VRAM (Only for Nvidia Right now, will automatically detect if multiple GPU's are Present)
+- Choose between CPU, GPU or Autodevice
+- Set CPU RAM/GPU VRAM (Only for Nvidia Right now, will automatically detect if multiple GPU's are Present)
 - Adjust pre-layer value
-- Load the model with 8-bit precision
+- Choose to run with 8bit, 16bit, trust_remote_code, Quant_attn, Autotune and no-cache flags
 - Enable authentication and choose an authentication file
 - Choose extensions for the WebUI
 - Enable local network mode and specify the listen port
 - Automatically open the browser when loading is finished
 - Save settings to a profile
 - Load profiles via Dropdown menu.
+- Run the text-generation-webui Updater
 
 ## How to Use
 1. Clone the repository or download the source code.
