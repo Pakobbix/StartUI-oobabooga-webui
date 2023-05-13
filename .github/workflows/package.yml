@@ -6,10 +6,7 @@ on:
 
 jobs:
   package:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: windows-latest
     steps:
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -26,14 +23,7 @@ jobs:
           pip install pyinstaller
 
       - name: Build and package
-        run: |
-          if [ ${{ matrix.os }} == 'ubuntu-latest' ]; then
-            pyinstaller --noconfirm --onefile --windowed StartUI.py
-          elif [ ${{ matrix.os }} == 'windows-latest' ]; then
-            pyinstaller --noconfirm --onefile --windowed StartUI.py
-          elif [ ${{ matrix.os }} == 'macos-latest' ]; then
-            pyinstaller --noconfirm --onefile --windowed StartUI.py
-          fi
+        run: pyinstaller --noconfirm --onefile --windowed StartUI.py
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
