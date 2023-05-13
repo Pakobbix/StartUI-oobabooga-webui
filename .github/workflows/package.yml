@@ -25,17 +25,6 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Get Last Tag
-        id: last_tag
-        run: echo "::set-output name=tag::$(git describe --abbrev=0 --tags)"
-
-      - name: Increment Tag
-        id: incremented_tag
-        run: |
-          tag=${{ steps.last_tag.outputs.tag }}
-          incremented_tag=$(python -c "version_parts = tag.split('.'); version_parts[-1] = str(float(version_parts[-1]) + 0.1); print('.'.join(version_parts))")
-          echo "::set-output name=tag::$incremented_tag"
-
       - name: Build and package
         run: |
           pyinstaller --noconfirm --onefile --windowed StartUI.py
@@ -44,5 +33,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: ${{ matrix.os }}-binary-v${{ steps.incremented_tag.outputs.tag }}
+          name: ${{ matrix.os }}-binary-v1.1
           path: dist
