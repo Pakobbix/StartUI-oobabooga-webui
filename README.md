@@ -28,7 +28,7 @@ WebUI StartGUI is a Python graphical user interface (GUI) written with PyQT5, th
 
 
 ## Binary Download
-Binary releases of this script can be found in the [Releases](https://github.com/your-username/your-repository/releases) section of this repository.
+Binary releases of this script can be found in the [Releases](https://github.com/Pakobbix/StartUI-oobabooga-webui/releases) section of this repository.
 
 ## Credits
 StartGUI is developed and maintained by [Pakobbix](https://github.com/Pakobbix). 
