@@ -9,7 +9,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
     steps:
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -31,5 +31,6 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: packaged-files
+          name: ${{ matrix.os }}-binary
           path: dist  # Assuming the packaged files are created in a 'dist' directory
+
