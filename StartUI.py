@@ -77,7 +77,7 @@ class MainWindow(QMainWindow):
 
         # Mode Dropdown
         self.mode_dropdown = QComboBox()
-        self.mode_dropdown.addItems(["chat", "cai-chat", "notebook"])
+        self.mode_dropdown.addItems(["chat", "cai_chat", "notebook"])
         layout.addWidget(QLabel("Choose Mode:"))
         self.mode_dropdown.setToolTip("Choose what kind of UI you want to load.")
         layout.addWidget(self.mode_dropdown)
