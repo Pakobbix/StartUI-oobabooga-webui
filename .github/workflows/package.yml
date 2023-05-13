@@ -9,7 +9,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest]
     steps:
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -25,12 +25,24 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Get Last Tag
+        id: last_tag
+        run: echo "::set-output name=tag::$(git describe --abbrev=0 --tags)"
+
+      - name: Increment Tag
+        id: incremented_tag
+        run: |
+          tag=${{ steps.last_tag.outputs.tag }}
+          incremented_tag=$(python -c "version_parts = tag.split('.'); version_parts[-1] = str(float(version_parts[-1]) + 0.1); print('.'.join(version_parts))")
+          echo "::set-output name=tag::$incremented_tag"
+
       - name: Build and package
-        run: pyinstaller --noconfirm --onefile --windowed StartUI.py
+        run: |
+          pyinstaller --noconfirm --onefile --windowed StartUI.py
+          cp webuiGUI.py dist/  # Copy webuiGUI.py to the dist directory
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: ${{ matrix.os }}-binary
-          path: dist  # Assuming the packaged files are created in a 'dist' directory
-
+          name: ${{ matrix.os }}-binary-v${{ steps.incremented_tag.outputs.tag }}
+          path: dist
