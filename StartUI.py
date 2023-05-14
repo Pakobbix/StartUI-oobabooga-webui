@@ -56,12 +56,17 @@ class MainWindow(QMainWindow):
         # Model Dropdown
         # Get the list of model folders
         model_folders = [name for name in os.listdir(model_folder) if os.path.isdir(os.path.join(model_folder, name))]
-
         self.model_dropdown = QComboBox()
         self.model_dropdown.addItems(model_folders)
         layout.addWidget(QLabel("Choose Model:"))
         self.model_dropdown.setToolTip("Select your prefered Model")
         layout.addWidget(self.model_dropdown, 1, 0)
+
+        self.model_type = QComboBox()
+        self.model_type.addItems(["llama", "opt", "gptj", "none"])
+        layout.addWidget(QLabel("Choose Model Type:"), 3, 0)
+        self.model_type.setToolTip("Select the Model Type")
+        layout.addWidget(self.model_type, 4, 0)
 
         self.reload_model_button = QPushButton("Reload")
         self.reload_model_button.setToolTip("Reloads the Names in the Models Folder")
@@ -93,7 +98,7 @@ class MainWindow(QMainWindow):
         self.update_button = QPushButton("Update oobabooga")
         self.update_button.setToolTip("Starts the Update Routine for the text-generation-webui")
         self.update_button.clicked.connect(self.on_update_button_clicked)
-        layout.addWidget(self.update_button, 5, 1)
+        layout.addWidget(self.update_button, 8, 1)
         layout.addWidget(QLabel("Update the text-generation-webui:"), 7, 1)
 
         # Add horizontal line to seperate the CPU/GPU Settings
@@ -140,7 +145,7 @@ class MainWindow(QMainWindow):
             layout.addWidget(vram_slider, 11 + i, 1)
     
             vram_value_label = QLabel("0 GiB")
-            layout.addWidget(vram_value_label, 11 + i, 3)
+            layout.addWidget(vram_value_label, 11 + i, 2)
             self.gpu_vram_labels.append(vram_value_label)
     
             self.gpu_vram_sliders.append(vram_slider)
@@ -165,7 +170,7 @@ class MainWindow(QMainWindow):
     
         self.ram_value_label = QLabel("0 GiB")
         self.ram_value_label.hide()
-        layout.addWidget(self.ram_value_label, 11, 3)
+        layout.addWidget(self.ram_value_label, 11, 2)
 
         # Pre-layer Slider
         self.pre_layer_slider = QSlider(Qt.Horizontal)
@@ -176,9 +181,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel("Pre-layer:"), 11 + len(gpu_stats), 0)
         self.pre_layer_slider.setToolTip("The number of layers to allocate to the GPU. Setting this parameter enables CPU offloading for 4-bit models.")
         layout.addWidget(self.pre_layer_slider)
+        self.pre_layer_slider.valueChanged.connect(self.on_pre_layer_slider_changed)
 
         self.pre_layer_value_label = QLabel("0")
-        layout.addWidget(self.pre_layer_value_label, 11 + len(gpu_stats), 3)
+        layout.addWidget(self.pre_layer_value_label, 11 + len(gpu_stats), 2)
 
         # Connect the valueChanged signal of the RAM slider to update the value label
         self.ram_slider.valueChanged.connect(self.on_ram_slider_changed)
@@ -364,6 +370,7 @@ class MainWindow(QMainWindow):
         self.load_button.clicked.connect(self.on_load_button_clicked)
         layout.addWidget(self.load_button, 30 + len(gpu_stats), 1)
 
+    
     def on_use_disk_checkbox_changed(self, state):
         self.change_disk_cache_checkbox.setVisible(state == Qt.Checked)
         self.current_disk_cache_label.setVisible(state == Qt.Checked)
@@ -386,13 +393,6 @@ class MainWindow(QMainWindow):
             self.disk_cache_textfield.setText(folder)
             self.disk_cache_path = folder
             self.current_disk_cache_label.setText(f"Current Cache Folder: {self.disk_cache_path}")
-
-    def on_download_hf_button_clicked(self):
-        hf_models = "https://huggingface.co/models?pipeline_tag=text-generation&sort=modified"
-        if platform.system() == 'Windows':
-            os.startfile(hf_models)
-        elif platform.system() == 'Linux':
-            subprocess.Popen(["xdg-open", hf_models])
 
     def show_error_message(self, message):
         QMessageBox.critical(self, "Error", message)
@@ -490,6 +490,7 @@ class MainWindow(QMainWindow):
     def on_save_button_clicked(self):
         settings = {
             "model": self.model_dropdown.currentText(), # Saves the Current selected Model
+            "model_type": self.model_type.currentText(), # Saves the Current selected Model Type
             "wbits": self.wbit_dropdown.currentText(), # Saves the WBIT Setting
             "groupsize": self.gsize_dropdown.currentText(), # Saves the Groupsize
             "mode": self.mode_dropdown.currentText(), # Saves the selected interaction mode (Chat,cai_chat,Notebook)
@@ -531,12 +532,28 @@ class MainWindow(QMainWindow):
         with open(file_path, "w") as file:
             json.dump(settings, file, indent=4)
 
+    def expression_check(self, command):
+        selected_model = self.model_dropdown.currentText()
+        #print(f"Selected model: {selected_model}")
+        
+        # Use a regular expression to check if the selected model matches the pattern
+        if re.search(r".*mpt.*7b", selected_model, re.IGNORECASE):
+            # Run the additional commands
+            run_cmd_with_conda("pip install einops && exit")
+        elif re.search(r".*vicuna.*7b", selected_model, re.IGNORECASE):
+            pass
+
     def on_start_button_clicked(self):
         command = ""
 
         # Add the chosen model to the command
         chosen_model = self.model_dropdown.currentText()
         command += f" --model {chosen_model}"
+
+        # Add the chosen model type to the command
+        chosen_model_type = self.model_type.currentText()
+        if self.model_type.currentText() != "none":
+            command += f" --model_type {chosen_model_type}"
 
         # Adds wbits to the command, if not "none"
         chosen_wbits = self.wbit_dropdown.currentText()
@@ -599,6 +616,9 @@ class MainWindow(QMainWindow):
         # Use "Trust Remote Code=TRUE" for ex. MPT-7B
         if self.use_trc_checkbox.isChecked():
             command += " --trust-remote-code"
+        if re.search(r"mpt.*7b", chosen_model):
+            if not self.use_trc_checkbox.isChecked():
+                command += " --trust-remote-code"
 
         # Use Triton Warmup & Autotune
         if self.use_autotune_checkbox.isChecked():
@@ -652,7 +672,10 @@ class MainWindow(QMainWindow):
             command += f" --extensions {' '.join(extensions)}"
 
         # Just for debugging.
-        #print(f"Command generated: python webuiGUI.py{command}")
+        #print(f"Command generated: python webuiGUI.py {command}")
+
+        # Based on the Model that's chosen, we will take care of some necessary stuff.
+        # Starts the webui in the conda env with the user given Options
         run_cmd_with_conda(f"python webuiGUI.py {command}")
 
         if self.use_autoclose_checkbox.isChecked():
@@ -686,6 +709,7 @@ class MainWindow(QMainWindow):
 
     def apply_load_settings(self, settings):
         self.model_dropdown.setCurrentText(settings.get("model", ""))
+        self.model_type.setCurrentText(settings.get("model_type", ""))
         self.wbit_dropdown.setCurrentText(settings.get("wbits", ""))
         self.gsize_dropdown.setCurrentText(settings.get("groupsize", ""))
         self.mode_dropdown.setCurrentText(settings.get("mode", ""))
