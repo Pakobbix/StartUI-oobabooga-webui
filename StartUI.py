@@ -6,6 +6,7 @@ profiles_folder = "./profiles"
 os.makedirs(profiles_folder, exist_ok=True)
 model_folder = "./text-generation-webui/models"
 extensions_folder = "./text-generation-webui/extensions"
+loras_folder = "./text-generation-webui/loras"
 
 # # Get the absolute path of the script file
 script_path = os.path.abspath(__file__)
@@ -298,11 +299,16 @@ class MainWindow(QMainWindow):
         self.choose_file_button.clicked.connect(self.on_choose_file_button_clicked)
         layout.addWidget(self.choose_file_button, 24 + len(gpu_stats), 0)
 
-        # Extensions List
+        # Extensions Selection Menu
+        self.use_extensions_checkbox = QCheckBox("Use Extensions")
+        self.use_extensions_checkbox.setToolTip("Choose the extensions to be loaded.")
+        layout.addWidget(self.use_extensions_checkbox, 25 + len(gpu_stats), 0)
+        self.use_extensions_checkbox.stateChanged.connect(self.on_use_extensions_checkbox_changed)
+
         self.extensions_list = QListWidget()
         self.extensions_list.setToolTip("Choose the extensions to be loaded.")
-        layout.addWidget(QLabel("Choose Extensions:"), 25 + len(gpu_stats), 0)
-        layout.addWidget(self.extensions_list, 25 + len(gpu_stats), 1)
+        layout.addWidget(self.extensions_list, 25 + len(gpu_stats), 1, 1, 2)
+        self.extensions_list.setVisible(False)
         extensions = [name for name in os.listdir(extensions_folder) if os.path.isdir(os.path.join(extensions_folder, name))]
 
         for extension in extensions:
@@ -311,31 +317,49 @@ class MainWindow(QMainWindow):
             item.setCheckState(Qt.Unchecked)
             self.extensions_list.addItem(item)
 
+        # Lora selection menu
+        self.use_lora_checkbox = QCheckBox("Use Loras")
+        self.use_lora_checkbox.setToolTip("Choose the loras to be loaded.")
+        layout.addWidget(self.use_lora_checkbox, 26 + len(gpu_stats), 0)
+        self.use_lora_checkbox.stateChanged.connect(self.on_use_lora_checkbox_changed)
+
+        self.lora_list = QListWidget()
+        self.lora_list.setToolTip("Choose the loras to be loaded.")
+        layout.addWidget(self.lora_list, 26 + len(gpu_stats), 1, 1, 2)
+        self.lora_list.setVisible(False)
+        
+        loras = [name for name in os.listdir(loras_folder) if os.path.isdir(os.path.join(loras_folder, name))]
+        for lora in loras:
+            item = QListWidgetItem(lora)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Unchecked)
+            self.lora_list.addItem(item)
+
         # Use Whole Local Network
         self.use_network_checkbox = QCheckBox("Local Network Mode")
         self.use_network_checkbox.setToolTip("By default, the WebUI will only be reachable by the PC running it.\nIf you want to use it also on other devices, check this")
-        layout.addWidget(self.use_network_checkbox, 26 + len(gpu_stats), 0)
+        layout.addWidget(self.use_network_checkbox, 30 + len(gpu_stats), 0)
     
         # Listen Port Checkbox and Text Field
         self.listen_port_checkbox = QCheckBox("Listen Port")
         self.listen_port_checkbox.setToolTip("Choose the Port to use for the WebUI.\nDefault is 7680. If you want to use Stable Diffusion at the same time,\nor got other services running on this Port, you can change it in the textfield.")
         self.listen_port_checkbox.stateChanged.connect(self.on_listen_port_checkbox_changed)
-        layout.addWidget(self.listen_port_checkbox, 26 + len(gpu_stats), 1)
+        layout.addWidget(self.listen_port_checkbox, 30 + len(gpu_stats), 1)
     
         self.listen_port_textfield = QLineEdit()
         self.listen_port_textfield.setPlaceholderText("Enter port number")
         self.listen_port_textfield.setEnabled(False)
-        layout.addWidget(self.listen_port_textfield, 27 + len(gpu_stats), 1)
+        layout.addWidget(self.listen_port_textfield, 31 + len(gpu_stats), 1)
     
         # Use Automatically opens the Browser when finished loading the webui
         self.use_autolaunch_checkbox = QCheckBox("Auto open Browser")
         self.use_autolaunch_checkbox.setToolTip("Automatically Opens your browser when loading is finished")
-        layout.addWidget(self.use_autolaunch_checkbox, 28 + len(gpu_stats), 0)
+        layout.addWidget(self.use_autolaunch_checkbox, 32 + len(gpu_stats), 0)
 
         # Auto Close the GUI when pressing start.
         self.use_autoclose_checkbox = QCheckBox("Close GUI on Start")
         self.use_autoclose_checkbox.setToolTip("Auto Close the GUI when pressing start button.")
-        layout.addWidget(self.use_autoclose_checkbox, 28 + len(gpu_stats), 1)
+        layout.addWidget(self.use_autoclose_checkbox, 32 + len(gpu_stats), 1)
     
         central_widget = QWidget()
         central_widget.setLayout(layout)
@@ -344,31 +368,37 @@ class MainWindow(QMainWindow):
         self.start_button = QPushButton("Start")
         self.start_button.setToolTip("Starts the Webui with the settings set by this GUI")
         self.start_button.clicked.connect(self.on_start_button_clicked)
-        layout.addWidget(self.start_button, 29 + len(gpu_stats), 0)
+        layout.addWidget(self.start_button, 33 + len(gpu_stats), 0)
 
         self.save_button = QPushButton("Save Settings")
         self.save_button.setToolTip("You can Save your current Settings. Neat, isn't it?")
         self.save_button.clicked.connect(self.on_save_button_clicked)
-        layout.addWidget(self.save_button, 30 + len(gpu_stats), 0)
+        layout.addWidget(self.save_button, 34 + len(gpu_stats), 0)
 
         # Textfield for the Profile Name
         self.profile_name_textfield = QLineEdit()
         self.profile_name_textfield.setPlaceholderText("Enter Name for the Profile, keep empty to overwrite default")
         self.profile_name_textfield.setToolTip("You can leave this blank, then only the default profile will be overwritten. If you want to get some organizing done, you can name it. For example:\nProfile for RP\nProfile for Chat\nProfile for coding\nProfile for Superbooga\nERROR: 404 no limits found")
-        layout.addWidget(self.profile_name_textfield, 31 + len(gpu_stats), 0)
+        layout.addWidget(self.profile_name_textfield, 35 + len(gpu_stats), 0)
 
         # Profiles Dropdown
         self.profiles_dropdown = QComboBox()
         self.populate_profiles_dropdown()
         self.profiles_dropdown.setToolTip("Here you can choose which profile you want to load. Choose, Load, Profit.")
-        layout.addWidget(QLabel("Choose Profile:"), 29 + len(gpu_stats), 1)
-        layout.addWidget(self.profiles_dropdown, 31 + len(gpu_stats), 1)
+        layout.addWidget(QLabel("Choose Profile:"), 33 + len(gpu_stats), 1)
+        layout.addWidget(self.profiles_dropdown, 35 + len(gpu_stats), 1)
     
         # Load Button
         self.load_button = QPushButton("Load")
         self.load_button.setToolTip("It's a button. That loads a selected Profile. Sometimes, I'm just create explaining things.")
         self.load_button.clicked.connect(self.on_load_button_clicked)
-        layout.addWidget(self.load_button, 30 + len(gpu_stats), 1)
+        layout.addWidget(self.load_button, 34 + len(gpu_stats), 1)
+
+    def on_use_extensions_checkbox_changed(self, state):
+        self.extensions_list.setVisible(state == Qt.Checked)
+
+    def on_use_lora_checkbox_changed(self, state):
+        self.lora_list.setVisible(state == Qt.Checked)
 
     
     def on_use_disk_checkbox_changed(self, state):
@@ -518,17 +548,17 @@ class MainWindow(QMainWindow):
             "authentication": self.authentication_checkbox.isChecked(), # Saves the state of the Authentication
             "authentication_file": self.choose_file_label.text(),  # Save the authentication file path
             "gpu_vram": [slider.value() for slider in self.gpu_vram_sliders], # Saves the VRAM Values
-            "extensions": [self.extensions_list.item(i).text() for i in range(self.extensions_list.count()) if self.extensions_list.item(i).checkState() == Qt.Checked] # Saves the chosen Extensions
+            "use_extension": self.use_extensions_checkbox.isChecked(), # Saves the state of the Extension Checkbox
+            "extensions": [self.extensions_list.item(i).text() for i in range(self.extensions_list.count()) if self.extensions_list.item(i).checkState() == Qt.Checked], # Saves the chosen Extensions
+            "use_lora": self.use_lora_checkbox.isChecked(), # Saves the state of the Lora Checkbox
+            "loras": [self.lora_list.item(i).text() for i in range(self.lora_list.count()) if self.lora_list.item(i).checkState() == Qt.Checked] # Saves the chosen loras
         }
 
         # Get the text entered in the text field
         profile_name = self.profile_name_textfield.text()
-    
         if not profile_name:
             profile_name = "default"
-    
         file_path = os.path.join(profiles_folder, f"{profile_name}.json")
-    
         with open(file_path, "w") as file:
             json.dump(settings, file, indent=4)
 
@@ -554,6 +584,15 @@ class MainWindow(QMainWindow):
         chosen_model_type = self.model_type.currentText()
         if self.model_type.currentText() != "none":
             command += f" --model_type {chosen_model_type}"
+
+        # Add loras to the command
+#        if self.loras_checkbox.isChecked():
+#            loras = self.lora_list.item(i).text() for i in range(self.lora_list.count()) if self.lora_list.item(i).checkState() == Qt.Checked
+#            command += f" --lora {loras}"
+        loras = [self.lora_list.item(i).text() for i in range(self.lora_list.count()) if self.lora_list.item(i).checkState() == Qt.Checked]
+        if self.use_lora_checkbox.isChecked():
+            if loras:
+                command += f" --lora {' '.join(loras)}"
 
         # Adds wbits to the command, if not "none"
         chosen_wbits = self.wbit_dropdown.currentText()
@@ -668,8 +707,9 @@ class MainWindow(QMainWindow):
 
         # Adds the chosen extensions to the list of the command.
         extensions = [self.extensions_list.item(i).text() for i in range(self.extensions_list.count()) if self.extensions_list.item(i).checkState() == Qt.Checked]
-        if extensions:
-            command += f" --extensions {' '.join(extensions)}"
+        if self.use_extensions_checkbox.isChecked():
+            if extensions:
+                command += f" --extensions {' '.join(extensions)}"
 
         # Just for debugging.
         #print(f"Command generated: python webuiGUI.py {command}")
@@ -744,6 +784,7 @@ class MainWindow(QMainWindow):
         for idx, slider in enumerate(self.gpu_vram_sliders):
             if idx < len(gpu_vram_settings):
                 slider.setValue(gpu_vram_settings[idx])
+        self.use_extensions_checkbox.setChecked(settings.get("use_extension", False))
         extensions_settings = settings.get("extensions", [])
         for i in range(self.extensions_list.count()):
             extension = self.extensions_list.item(i).text()
@@ -751,6 +792,14 @@ class MainWindow(QMainWindow):
                 self.extensions_list.item(i).setCheckState(Qt.Checked)
             else:
                 self.extensions_list.item(i).setCheckState(Qt.Unchecked)
+        self.use_lora_checkbox.setChecked(settings.get("use_lora", False))
+        lora_settings = settings.get("loras", [])
+        for i in range(self.lora_list.count()):
+            lora = self.lora_list.item(i).text()
+            if lora in lora_settings:
+                self.lora_list.item(i).setCheckState(Qt.Checked)
+            else:
+                self.lora_list.item(i).setCheckState(Qt.Unchecked)
 
 
     def load_settings(self):
