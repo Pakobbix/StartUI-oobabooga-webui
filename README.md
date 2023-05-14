@@ -40,8 +40,12 @@ On Linux, you'll need to give StartUI the executable flag (`chmod +x StartUI` or
 The WebuiGUI.py must also be there, to handle the flags properly
 
 ## Screenshots
-![Screenshot 2023-05-13 151352](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/80b389c7-d741-4aad-897e-7b2ac73d1af6)
-![Screenshot 2023-05-13 151446](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/a7967eda-3aa2-4c2e-8f47-d9232958df40)
+V1.1 :\
+![Screenshot 2023-05-13 232040](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/565feaea-ef67-4081-9978-2aa314763da7)
+![Screenshot 2023-05-13 232054](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/1c2a9acf-b193-4dd2-abd5-08dcd719c550)
+![Screenshot 2023-05-13 232103](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/cfd11947-b11b-4ef4-be74-d5e15ab75b22)
+
+
 
 ## Credits
 StartGUI is developed and maintained by [Pakobbix](https://github.com/Pakobbix). 
