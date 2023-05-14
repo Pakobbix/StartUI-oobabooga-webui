@@ -33,12 +33,32 @@ def run_cmd_with_conda(cmd, env=None):
         # Open a separate terminal window and execute the command
         subprocess.Popen(['start', 'cmd', '/k', full_cmd], shell=True, env=env)
     elif platform.system() == 'Linux':
-        # For Linux, activate the Conda environment using the conda command
-        activate_cmd = f"conda activate {conda_env_path} && "
-        full_cmd = f"source ./installer_files/conda/etc/profile.d/conda.sh && conda run -p {conda_env_path} {cmd}"
+        # Define the necessary variables from the bash script
+        install_dir = os.path.dirname(os.path.abspath(__file__))
+        conda_root_prefix = os.path.join(install_dir, "installer_files", "conda")
+        install_env_dir = os.path.join(install_dir, "installer_files", "env")
 
-        # Open a separate terminal window and execute the command
-        process = subprocess.Popen(['gnome-terminal', '--', 'bash', '-c', full_cmd], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # For Linux, activate the Conda environment
+        activate_cmd = f"source {os.path.join(conda_root_prefix, 'etc', 'profile.d', 'conda.sh')} && conda activate {install_env_dir}"
+
+        # Check for available terminal emulators
+        terminal_emulators = ['xdg-terminal', 'gnome-terminal', 'konsole', 'xfce4-terminal', 'mate-terminal', 'lxterminal', 'termite', 'tilix', 'xterm']
+        terminal_cmd = None
+
+        for emulator in terminal_emulators:
+            try:
+                subprocess.run([emulator, '--version'], check=True)
+                terminal_cmd = emulator
+                break
+            except FileNotFoundError:
+                continue
+
+        if terminal_cmd is None:
+            raise RuntimeError("No compatible terminal emulator found.")
+
+        # Execute the command within the Conda environment in a separate terminal
+        print(cmd)
+        subprocess.Popen([terminal_cmd, '--', 'bash', '-c', f"{activate_cmd} && {cmd}"], env=env)
 
 class MainWindow(QMainWindow):
     def __init__(self):
