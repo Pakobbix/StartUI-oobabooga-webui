@@ -84,12 +84,6 @@ class MainWindow(QMainWindow):
         help_menu = menu.addMenu("Help")
 
         # Help menu actions
-        # About Action
-        about_action = QAction("About", self)
-        about_action.setToolTip("Opens the About Page")
-        about_action.triggered.connect(self.show_about_window)
-        help_menu.addAction(about_action)
-
         # Github action
         github_action = QAction("Github", self)
         github_action.setStatusTip("Opens the Github Page")
@@ -107,6 +101,21 @@ class MainWindow(QMainWindow):
         version_action.setStatusTip("Shows the Version of StartUI")
         help_menu.addAction(version_action)
         version_action.triggered.connect(self.show_version_window)
+
+        # About Action
+        about_action = QAction("About", self)
+        about_action.setToolTip("Opens the About Page")
+        about_action.triggered.connect(self.show_about_window)
+        help_menu.addAction(about_action)
+
+        # seperator
+        help_menu.addSeparator()
+
+        # Report Bug
+        report_bug_action = QAction("Report Bug", self)
+        report_bug_action.setToolTip("Opens the Github Issue Page with creating a new issue")
+        report_bug_action.triggered.connect(self.on_report_bug_clicked)
+        help_menu.addAction(report_bug_action)
 
         layout = QGridLayout()
         layout.setColumnMinimumWidth(3, 30)
@@ -483,6 +492,16 @@ class MainWindow(QMainWindow):
                         subprocess.Popen(["xdg-open", release_url])
                     except OSError:
                         self.show_error_message("Error", f"Could not open the link. Please open it manually.\n{release_url}")
+
+    def on_report_bug_clicked(self):
+        github_new_issue = "https://github.com/Pakobbix/StartUI-oobabooga-webui/issues/new"
+        if sys.platform == "win32":
+            os.startfile(github_new_issue)
+        else:
+            try:
+                subprocess.Popen(["xdg-open", github_new_issue])
+            except OSError:
+                self.show_error_message("Error", f"Could not open the link. Please open it manually.\n{github_new_issue}")
 
     def on_Github_clicked(self):
         startui_url = "https://github.com/Pakobbix/StartUI-oobabooga-webui/"
