@@ -1,6 +1,6 @@
 PyQt5
 gpustat
 psutil
-pyqtdarktheme
+qdarkstyle
 darkdetect
 requests

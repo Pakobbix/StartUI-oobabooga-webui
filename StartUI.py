@@ -1,8 +1,8 @@
-import sys, gpustat, os, json, subprocess, platform, psutil, urllib.request, re, requests, darkdetect, qdarktheme
-from PyQt5.QtWidgets import QApplication, QToolBar, QMessageBox, QAction, QProgressBar, QMainWindow, QLabel, QVBoxLayout, QComboBox, QSlider, QCheckBox, QLineEdit, QFileDialog, QPushButton, QWidget, QListWidget, QListWidgetItem, QToolTip, QGridLayout, QRadioButton, QFrame, QDialog
+import sys, gpustat, os, json, subprocess, platform, psutil, re, requests, darkdetect, qdarkstyle
+from PyQt5.QtWidgets import QApplication, QToolBar, QMessageBox, QAction, QMainWindow, QLabel, QVBoxLayout, QComboBox, QSlider, QCheckBox, QLineEdit, QFileDialog, QPushButton, QWidget, QListWidget, QListWidgetItem, QGridLayout, QRadioButton, QFrame
 from PyQt5.QtCore import Qt
 
-version = "1.3"
+version = "1.3.1"
 
 profiles_folder = "./profiles"
 os.makedirs(profiles_folder, exist_ok=True)
@@ -860,11 +860,11 @@ class MainWindow(QMainWindow):
                 command += f" --extensions {' '.join(extensions)}"
 
         # Just for debugging.
-        #print(f"Command generated: python webuiGUI.py {command}")
+        print(f"Command generated: python webuiGUI.py {command}")
 
         # Based on the Model that's chosen, we will take care of some necessary stuff.
         # Starts the webui in the conda env with the user given Options
-        run_cmd_with_conda(f"python webuiGUI.py {command}")
+        #run_cmd_with_conda(f"python webuiGUI.py {command}")
 
         if self.use_autoclose_checkbox.isChecked():
             sys.exit()
@@ -973,7 +973,8 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     main_window = MainWindow()
-    if darkdetect.isDark():
-        app.setStyleSheet(qdarktheme.load_stylesheet())
     main_window.show()
+    if darkdetect.isDark():
+        dark_stylesheet = qdarkstyle.load_stylesheet_pyqt5()
+        app.setStyleSheet(dark_stylesheet)
     sys.exit(app.exec_())
