@@ -455,7 +455,7 @@ class MainWindow(QMainWindow):
         # Show if Update is available
         self.update_button_ui = QPushButton("Update\nAvailable")
         self.update_button_ui.setToolTip("Shows if an update is available")
-        self.update_button_ui.setStyleSheet("QLabel { color : red; font-weight: bold; qproperty-alignment: AlignCenter; }")
+        self.update_button_ui.setStyleSheet("QPushButton { color: #ff9999; font-weight: bold; }")
         self.update_button_ui.clicked.connect(self.on_update_button_ui_clicked)
         layout.addWidget(self.update_button_ui, 34 + len(gpu_stats), 2, 2, 2)
         self.update_button_ui.setVisible(False)
