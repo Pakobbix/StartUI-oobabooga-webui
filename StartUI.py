@@ -1,4 +1,4 @@
-import sys, gpustat, os, json, subprocess, platform, psutil, urllib.request, re, requests
+import sys, gpustat, os, json, subprocess, platform, psutil, urllib.request, re, requests, darkdetect, qdarktheme
 from PyQt5.QtWidgets import QApplication, QToolBar, QMessageBox, QAction, QProgressBar, QMainWindow, QLabel, QVBoxLayout, QComboBox, QSlider, QCheckBox, QLineEdit, QFileDialog, QPushButton, QWidget, QListWidget, QListWidgetItem, QToolTip, QGridLayout, QRadioButton, QFrame, QDialog
 from PyQt5.QtCore import Qt
 
@@ -973,5 +973,7 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     main_window = MainWindow()
+    if darkdetect.isDark():
+        app.setStyleSheet(qdarktheme.load_stylesheet())
     main_window.show()
     sys.exit(app.exec_())
