@@ -73,6 +73,41 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle('StartUI for oobabooga webui')
+        # Menu Bar
+        menu = self.menuBar()
+
+        # Main menu
+        main_menu = menu.addMenu("StartUI")
+        main_menu.addAction("Exit", self.close)
+
+        # help menu
+        help_menu = menu.addMenu("Help")
+
+        # Help menu actions
+        # About Action
+        about_action = QAction("About", self)
+        about_action.setToolTip("Opens the About Page")
+        about_action.triggered.connect(self.show_about_window)
+        help_menu.addAction(about_action)
+
+        # Github action
+        github_action = QAction("Github", self)
+        github_action.setStatusTip("Opens the Github Page")
+        github_action.triggered.connect(self.on_Github_clicked)
+        help_menu.addAction(github_action)
+
+        # Oobabooga action
+        oobabooga_action = QAction("oobabooga", self)
+        oobabooga_action.setStatusTip("Opens the oobabooga Github Page")
+        oobabooga_action.triggered.connect(self.on_oobabooga_clicked)
+        help_menu.addAction(oobabooga_action)
+
+        # Version action
+        version_action = QAction(f"Version: {version}", self)
+        version_action.setStatusTip("Shows the Version of StartUI")
+        help_menu.addAction(version_action)
+        version_action.triggered.connect(self.show_version_window)
+
         layout = QGridLayout()
         layout.setColumnMinimumWidth(3, 30)
 
@@ -448,6 +483,26 @@ class MainWindow(QMainWindow):
                     except OSError:
                         self.show_error_message("Error", f"Could not open the link. Please open it manually.\n{release_url}")
 
+    def on_Github_clicked(self):
+        startui_url = "https://github.com/Pakobbix/StartUI-oobabooga-webui/"
+        if sys.platform == "win32":
+            os.startfile(startui_url)
+        else:
+            try:
+                subprocess.Popen(["xdg-open", startui_url])
+            except OSError:
+                self.show_error_message("Error", f"Could not open the link. Please open it manually.\n{startui_url}")
+
+    def on_oobabooga_clicked(self):
+        oobabooga_url = "https://github.com/oobabooga/text-generation-webui"
+        if sys.platform == "win32":
+            os.startfile(oobabooga_url)
+        else:
+            try:
+                subprocess.Popen(["xdg-open", oobabooga_url])
+            except OSError:
+                self.show_error_message("Error", f"Could not open the link. Please open it manually.\n{oobabooga_url}")
+
     def get_latest_version(self):
         try:
             url = "https://api.github.com/repos/Pakobbix/StartUI-oobabooga-webui/releases/latest"
@@ -475,6 +530,15 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Error fetching release notes: {str(e)}")
             return None
+
+    def show_about_window(self, action):
+        latest_version = self.get_latest_version()
+        release_url = f"https://github.com/Pakobbix/StartUI-oobabooga-webui/releases/tag/{latest_version}"
+        if latest_version and latest_version > version:
+            about_text = f"A new version ({latest_version}) is available! Please <a href='{release_url}'>update.</a> <br><br>StartUI for oobabooga's webui.<br><br> Current Version: {version}<br><br>This is an GUI (Graphical User Interface), to set flags depending on the user selection."
+        else:
+            about_text = f"StartUI for oobabooga's webui.\n\nVersion: {version}\n\nThis is an GUI (Graphical User Interface), to set flags depending on the user selection."
+        QMessageBox.about(self, "About", about_text)
 
     def on_use_extensions_checkbox_changed(self, state):
         self.extensions_list.setVisible(state == Qt.Checked)
