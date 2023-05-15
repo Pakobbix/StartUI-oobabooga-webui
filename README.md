@@ -7,7 +7,7 @@ As someone who isn't a professional programmer, I enjoy experimenting and findin
 WebUI StartGUI is a Python graphical user interface (GUI) written with PyQT5, that allows users to configure settings and start the oobabooga web user interface (WebUI). It provides a convenient way to adjust various parameters and launch the WebUI with the desired settings.
 
 ## Current Features
-- Select a model from a dropdown menu (with reload button if added while the StartUI is open)
+- Select a model from a dropdown menu or none (with reload button if added while the StartUI is open)
 - Choose wbits and groupsize options
 - Select the operating mode (chat, cai-chat, notebook)
 - Choose between CPU, GPU or Autodevice
@@ -21,10 +21,11 @@ WebUI StartGUI is a Python graphical user interface (GUI) written with PyQT5, th
 - Save settings to a profile
 - Load profiles via Dropdown menu.
 - Run the text-generation-webui Updater
+- StartUI Update Notification
 
 ## How to Use
 1. Clone the repository or download the source code.
-2. Install the required dependencies listed in the `requirements.txt` file. (PyQT5 & gpustat)
+2. Install the required dependencies listed in the `requirements.txt` file.
 3. Run the `StartUI.py` script using Python `python3 StartUI.py`.
 4. Configure the desired settings using the GUI elements.
 5. Click the "Save Settings" button to save the current settings to a profile.
@@ -40,10 +41,15 @@ On Linux, you'll need to give StartUI the executable flag (`chmod +x StartUI` or
 The WebuiGUI.py must also be there, to handle the flags properly
 
 ## Screenshots
-V1.1 :\
-![Screenshot 2023-05-13 232040](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/565feaea-ef67-4081-9978-2aa314763da7)
-![Screenshot 2023-05-13 232054](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/1c2a9acf-b193-4dd2-abd5-08dcd719c550)
-![Screenshot 2023-05-13 232103](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/cfd11947-b11b-4ef4-be74-d5e15ab75b22)
+V1.3 :\
+<details>
+  
+  <summary>Screenshots</summary>
+  
+  ![image](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/0796055f-dae8-4c05-8839-ac7a006446cc)
+  ![image](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/142f2570-4b53-4198-b40b-effa0fcc5bc3)
+
+  </details>
 
 
 
