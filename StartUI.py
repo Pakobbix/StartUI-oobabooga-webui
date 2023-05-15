@@ -114,6 +114,7 @@ class MainWindow(QMainWindow):
         # Model Dropdown
         # Get the list of model folders
         model_folders = [name for name in os.listdir(model_folder) if os.path.isdir(os.path.join(model_folder, name))]
+        model_folders.append("none")
         self.model_dropdown = QComboBox()
         self.model_dropdown.addItems(model_folders)
         layout.addWidget(QLabel("Choose Model:"))
@@ -724,11 +725,12 @@ class MainWindow(QMainWindow):
 
         # Add the chosen model to the command
         chosen_model = self.model_dropdown.currentText()
-        command += f" --model {chosen_model}"
+        if self.model_dropdown.currentText() != "none":
+            command += f" --model {chosen_model}"
 
         # Add the chosen model type to the command
         chosen_model_type = self.model_type.currentText()
-        if self.model_type.currentText() != "none":
+        if self.model_type.currentText() != "none" and self.model_dropdown.currentText() != "none":
             command += f" --model_type {chosen_model_type}"
 
         # Add loras to the command
@@ -736,20 +738,20 @@ class MainWindow(QMainWindow):
 #            loras = self.lora_list.item(i).text() for i in range(self.lora_list.count()) if self.lora_list.item(i).checkState() == Qt.Checked
 #            command += f" --lora {loras}"
         loras = [self.lora_list.item(i).text() for i in range(self.lora_list.count()) if self.lora_list.item(i).checkState() == Qt.Checked]
-        if self.use_lora_checkbox.isChecked():
+        if self.use_lora_checkbox.isChecked() and self.model_dropdown.currentText() != "none":
             if loras:
                 command += f" --lora {' '.join(loras)}"
 
         # Adds wbits to the command, if not "none"
         chosen_wbits = self.wbit_dropdown.currentText()
         if self.wbit_dropdown.currentText() != "none":
-            if not self.cpu_radio_button.isChecked():
+            if not self.cpu_radio_button.isChecked() and self.model_dropdown.currentText() != "none":
                 command += f" --wbits {chosen_wbits}"
 
         # Adds Groupsize to the command, if not "none"
         chosen_gsize = self.gsize_dropdown.currentText()
         if self.gsize_dropdown.currentText() != "none":
-            if not self.cpu_radio_button.isChecked():
+            if not self.cpu_radio_button.isChecked() and self.model_dropdown.currentText() != "none":
                 command += f" --groupsize {chosen_gsize}"
 
         # Add the chosen mode to the command (Chat, cai-chat, notebook)
@@ -858,11 +860,11 @@ class MainWindow(QMainWindow):
                 command += f" --extensions {' '.join(extensions)}"
 
         # Just for debugging.
-        #print(f"Command generated: python webuiGUI.py {command}")
+        print(f"Command generated: python webuiGUI.py {command}")
 
         # Based on the Model that's chosen, we will take care of some necessary stuff.
         # Starts the webui in the conda env with the user given Options
-        run_cmd_with_conda(f"python webuiGUI.py {command}")
+        #run_cmd_with_conda(f"python webuiGUI.py {command}")
 
         if self.use_autoclose_checkbox.isChecked():
             sys.exit()
