@@ -10,12 +10,12 @@ jobs:
         os: [windows-latest, ubuntu-latest]
     steps:
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v3
         with:
           python-version: 3.x
 
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
@@ -29,7 +29,7 @@ jobs:
           cp webuiGUI.py dist/  # Copy webuiGUI.py to the dist directory
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}-binary-v1.3.1
           path: dist
