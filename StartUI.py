@@ -860,11 +860,11 @@ class MainWindow(QMainWindow):
                 command += f" --extensions {' '.join(extensions)}"
 
         # Just for debugging.
-        print(f"Command generated: python webuiGUI.py {command}")
+        #print(f"Command generated: python webuiGUI.py {command}")
 
         # Based on the Model that's chosen, we will take care of some necessary stuff.
         # Starts the webui in the conda env with the user given Options
-        #run_cmd_with_conda(f"python webuiGUI.py {command}")
+        run_cmd_with_conda(f"python webuiGUI.py {command}")
 
         if self.use_autoclose_checkbox.isChecked():
             sys.exit()
