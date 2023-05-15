@@ -3,3 +3,4 @@ gpustat
 psutil
 pyqtdarktheme
 darkdetect
+requests
