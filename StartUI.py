@@ -1,6 +1,8 @@
-import sys, gpustat, os, json, subprocess, platform, psutil, urllib.request, re
-from PyQt5.QtWidgets import QApplication, QMessageBox, QProgressBar, QMainWindow, QLabel, QVBoxLayout, QComboBox, QSlider, QCheckBox, QLineEdit, QFileDialog, QPushButton, QWidget, QListWidget, QListWidgetItem, QToolTip, QGridLayout, QRadioButton, QFrame, QDialog
+import sys, gpustat, os, json, subprocess, platform, psutil, urllib.request, re, requests
+from PyQt5.QtWidgets import QApplication, QToolBar, QMessageBox, QAction, QProgressBar, QMainWindow, QLabel, QVBoxLayout, QComboBox, QSlider, QCheckBox, QLineEdit, QFileDialog, QPushButton, QWidget, QListWidget, QListWidgetItem, QToolTip, QGridLayout, QRadioButton, QFrame, QDialog
 from PyQt5.QtCore import Qt
+
+version = "1.3"
 
 profiles_folder = "./profiles"
 os.makedirs(profiles_folder, exist_ok=True)
@@ -67,10 +69,10 @@ class MainWindow(QMainWindow):
         self.init_ui()
         self.load_settings()
         self.set_ram_slider_max()
+        self.update_check()
 
     def init_ui(self):
         self.setWindowTitle('StartUI for oobabooga webui')
-        #layout = QVBoxLayout()
         layout = QGridLayout()
         layout.setColumnMinimumWidth(3, 30)
 
@@ -93,7 +95,7 @@ class MainWindow(QMainWindow):
         self.reload_model_button.setToolTip("Reloads the Names in the Models Folder")
         self.reload_model_button.clicked.connect(self.reload_models)
         layout.addWidget(QLabel("Reload the Model list:"),0, 1)
-        layout.addWidget(self.reload_model_button, 1, 1)
+        layout.addWidget(self.reload_model_button, 1, 1, 1 , 2)
 
         # WBIT Dropdown Menu
         self.wbit_dropdown = QComboBox()
@@ -107,7 +109,7 @@ class MainWindow(QMainWindow):
         self.gsize_dropdown.addItems(["32", "64", "128", "1024", "none"])
         layout.addWidget(QLabel("Choose Groupsize:"), 5, 1)
         self.gsize_dropdown.setToolTip("Select the groupsize used by the Model.\nExample: vicuna 7b 4bit-128g you should choose 128.\nYou can keep it at none, the webui will determine it automatically if the groupsize is mentioned in the name of the model")
-        layout.addWidget(self.gsize_dropdown, 6, 1)
+        layout.addWidget(self.gsize_dropdown, 6, 1, 1, 2)
 
         # Mode Dropdown
         self.mode_dropdown = QComboBox()
@@ -119,7 +121,7 @@ class MainWindow(QMainWindow):
         self.update_button = QPushButton("Update oobabooga")
         self.update_button.setToolTip("Starts the Update Routine for the text-generation-webui")
         self.update_button.clicked.connect(self.on_update_button_clicked)
-        layout.addWidget(self.update_button, 8, 1)
+        layout.addWidget(self.update_button, 8, 1, 1, 2)
         layout.addWidget(QLabel("Update the text-generation-webui:"), 7, 1)
 
         # Add horizontal line to seperate the CPU/GPU Settings
@@ -413,6 +415,66 @@ class MainWindow(QMainWindow):
         self.load_button.setToolTip("It's a button. That loads a selected Profile. Sometimes, I'm just create explaining things.")
         self.load_button.clicked.connect(self.on_load_button_clicked)
         layout.addWidget(self.load_button, 34 + len(gpu_stats), 1)
+
+        # Show if Update is available
+        self.update_button_ui = QPushButton("Update\nAvailable")
+        self.update_button_ui.setToolTip("Shows if an update is available")
+        self.update_button_ui.setStyleSheet("QLabel { color : red; font-weight: bold; qproperty-alignment: AlignCenter; }")
+        self.update_button_ui.clicked.connect(self.on_update_button_ui_clicked)
+        layout.addWidget(self.update_button_ui, 34 + len(gpu_stats), 2, 2, 2)
+        self.update_button_ui.setVisible(False)
+
+    def on_update_button_ui_clicked(self):
+        self.show_version_window()
+
+    def update_check(self):
+        latest_version = self.get_latest_version()
+        if latest_version and latest_version > version:
+            self.update_button_ui.setVisible(True)
+
+    def show_version_window(self):
+        latest_version = self.get_latest_version()
+        if latest_version and latest_version > version:
+            release_notes = self.get_release_notes()
+            update_text = f"A new version ({latest_version}) is available! Do you want to update?\n\n\n{release_notes}"
+            reply = QMessageBox.question(self, "Update Available", update_text, QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                release_url = f"https://github.com/Pakobbix/StartUI-oobabooga-webui/releases/tag/{latest_version}"
+                if sys.platform == "win32":
+                    os.startfile(release_url)
+                else:
+                    try:
+                        subprocess.Popen(["xdg-open", release_url])
+                    except OSError:
+                        self.show_error_message("Error", f"Could not open the link. Please open it manually.\n{release_url}")
+
+    def get_latest_version(self):
+        try:
+            url = "https://api.github.com/repos/Pakobbix/StartUI-oobabooga-webui/releases/latest"
+            response = requests.get(url)
+            if response.status_code == 200:
+                latest_release = response.json()
+                tag_name = latest_release["tag_name"]
+                return tag_name
+            else:
+                return None
+        except Exception as e:
+            print(f"Error fetching latest version: {str(e)}")
+            return None
+
+    def get_release_notes(self):
+        try:
+            url = "https://api.github.com/repos/Pakobbix/StartUI-oobabooga-webui/releases/latest"
+            response = requests.get(url)
+            if response.status_code == 200:
+                latest_release = response.json()
+                release_notes = latest_release["body"]
+                return release_notes
+            else:
+                return None
+        except Exception as e:
+            print(f"Error fetching release notes: {str(e)}")
+            return None
 
     def on_use_extensions_checkbox_changed(self, state):
         self.extensions_list.setVisible(state == Qt.Checked)
@@ -742,7 +804,7 @@ class MainWindow(QMainWindow):
             sys.exit()
             
     def on_update_button_clicked(self):
-        run_cmd_with_conda("python webuiGUI.py --update")
+        run_cmd_with_conda("python webuiGUI.py --update && exit")
 
     def load_profile(self, profile_file):
         with open(profile_file, "r") as file:
