@@ -9,6 +9,13 @@ os.makedirs(profiles_folder, exist_ok=True)
 model_folder = "./text-generation-webui/models"
 extensions_folder = "./text-generation-webui/extensions"
 loras_folder = "./text-generation-webui/loras"
+try:
+    output = subprocess.check_output(['nvidia-smi'])
+    nvidia_gpu = True
+except:
+    nvidia_gpu = False
+    pass
+
 
 # # Get the absolute path of the script file
 script_path = os.path.abspath(__file__)
@@ -72,7 +79,7 @@ class MainWindow(QMainWindow):
         self.update_check()
 
     def init_ui(self):
-        self.setWindowTitle('StartUI for oobabooga webui')
+        self.setWindowTitle(f'StartUI for oobabooga webui v{version}')
         # Menu Bar
         menu = self.menuBar()
 
@@ -118,20 +125,21 @@ class MainWindow(QMainWindow):
         help_menu.addAction(report_bug_action)
 
         layout = QGridLayout()
+        layout.setColumnMinimumWidth(0, 350)
         layout.setColumnMinimumWidth(3, 30)
 
         # Model Dropdown
         # Get the list of model folders
         model_folders = [name for name in os.listdir(model_folder) if os.path.isdir(os.path.join(model_folder, name))]
-        model_folders.append("none")
         self.model_dropdown = QComboBox()
+        self.model_dropdown.addItem("none")
         self.model_dropdown.addItems(model_folders)
         layout.addWidget(QLabel("Choose Model:"))
         self.model_dropdown.setToolTip("Select your prefered Model")
         layout.addWidget(self.model_dropdown, 1, 0)
 
         self.model_type = QComboBox()
-        self.model_type.addItems(["llama", "opt", "gptj", "none"])
+        self.model_type.addItems(["none", "llama", "opt", "gptj"])
         layout.addWidget(QLabel("Choose Model Type:"), 3, 0)
         self.model_type.setToolTip("Select the Model Type")
         layout.addWidget(self.model_type, 4, 0)
@@ -144,14 +152,14 @@ class MainWindow(QMainWindow):
 
         # WBIT Dropdown Menu
         self.wbit_dropdown = QComboBox()
-        self.wbit_dropdown.addItems(["1", "2", "3", "4","8", "none"])
+        self.wbit_dropdown.addItems(["none", "1", "2", "3", "4","8"])
         layout.addWidget(QLabel("Choose Wbits:"),5, 0)
         self.wbit_dropdown.setToolTip("Select the bits quantization for this model\nExample: vicuna 7b 4bit you should choose 4.\nYou can keep it at none, the webui will determine it automatically if the wbits are mentioned in the name of the model")
         layout.addWidget(self.wbit_dropdown, 6, 0)
 
         # Groupsize Dropdown Menu
         self.gsize_dropdown = QComboBox()
-        self.gsize_dropdown.addItems(["32", "64", "128", "1024", "none"])
+        self.gsize_dropdown.addItems(["none", "32", "64", "128", "1024"])
         layout.addWidget(QLabel("Choose Groupsize:"), 5, 1)
         self.gsize_dropdown.setToolTip("Select the groupsize used by the Model.\nExample: vicuna 7b 4bit-128g you should choose 128.\nYou can keep it at none, the webui will determine it automatically if the groupsize is mentioned in the name of the model")
         layout.addWidget(self.gsize_dropdown, 6, 1, 1, 2)
@@ -177,8 +185,13 @@ class MainWindow(QMainWindow):
 
         # GPU Checkbox and Sliders
         self.gpu_radio_button = QRadioButton("Use GPU")
-        self.gpu_radio_button.setToolTip("Choose if you want to use your GPU")
-        self.gpu_radio_button.setChecked(True)
+        if nvidia_gpu:
+            self.gpu_radio_button.setChecked(True)
+            self.gpu_radio_button.setToolTip("Choose if you want to use your GPU")
+        else:
+            self.gpu_radio_button.setToolTip("AMD or Intel GPU's are currently not supported.")
+            self.gpu_radio_button.setChecked(False)
+            self.gpu_radio_button.setEnabled(False)
         layout.addWidget(self.gpu_radio_button, 10, 0)
     
         self.cpu_radio_button = QRadioButton("Use CPU")
@@ -188,35 +201,40 @@ class MainWindow(QMainWindow):
 
         self.auto_radio_button = QRadioButton("Autodevice")
         self.auto_radio_button.setToolTip("Let the webui decide whats best for you!")
-        self.auto_radio_button.setChecked(False)
+        if nvidia_gpu:
+            self.auto_radio_button.setChecked(False)
+        else:
+            self.auto_radio_button.setChecked(True)
         layout.addWidget(self.auto_radio_button, 10, 2)
     
         self.gpu_radio_button.toggled.connect(self.on_gpu_radio_button_toggled)
         self.cpu_radio_button.toggled.connect(self.on_cpu_radio_button_toggled)
         self.auto_radio_button.toggled.connect(self.on_auto_radio_button_toggled)
     
-        self.gpu_vram_sliders = []
-        self.gpu_vram_labels = []
-        self.gpu_labels = []
+        if nvidia_gpu:
+            self.gpu_vram_sliders = []
+            self.gpu_vram_labels = []
+            self.gpu_labels = []
+            gpu_stats = gpustat.GPUStatCollection.new_query()
     
-        gpu_stats = gpustat.GPUStatCollection.new_query()
-    
-        for i, gpu in enumerate(gpu_stats):
-            gpu_label = QLabel(f"{gpu.name} VRAM:")
-            gpu_label.setToolTip(f"Total VRAM: {gpu.memory_total} MiB\nUsed VRAM: {gpu.memory_used} MiB\nFree VRAM: {gpu.memory_free} MiB")
-            layout.addWidget(gpu_label, 11 + i, 0)
-            self.gpu_labels.append(gpu_label)
-    
-            vram_slider = QSlider(Qt.Horizontal)
-            vram_slider.setMaximum(int(gpu.memory_total / 1024))
-            vram_slider.valueChanged.connect(lambda value, idx=i: self.on_vram_slider_changed(value, idx))
-            layout.addWidget(vram_slider, 11 + i, 1)
-    
-            vram_value_label = QLabel("0 GiB")
-            layout.addWidget(vram_value_label, 11 + i, 2)
-            self.gpu_vram_labels.append(vram_value_label)
-    
-            self.gpu_vram_sliders.append(vram_slider)
+            for i, gpu in enumerate(gpu_stats):
+                gpu_label = QLabel(f"{gpu.name} VRAM:")
+                gpu_label.setToolTip(f"Total VRAM: {gpu.memory_total} MiB\nUsed VRAM: {gpu.memory_used} MiB\nFree VRAM: {gpu.memory_free} MiB")
+                layout.addWidget(gpu_label, 11 + i, 0)
+                self.gpu_labels.append(gpu_label)
+        
+                vram_slider = QSlider(Qt.Horizontal)
+                vram_slider.setMaximum(int(gpu.memory_total / 1024))
+                vram_slider.valueChanged.connect(lambda value, idx=i: self.on_vram_slider_changed(value, idx))
+                layout.addWidget(vram_slider, 11 + i, 1)
+        
+                vram_value_label = QLabel("0 GiB")
+                layout.addWidget(vram_value_label, 11 + i, 2)
+                self.gpu_vram_labels.append(vram_value_label)
+        
+                self.gpu_vram_sliders.append(vram_slider)
+        else:
+            gpu_stats = [""]
 
         # Create the "Built-in RAM" label, slider, and value label
         self.ram_label = QLabel("Built-in RAM:")
@@ -248,7 +266,7 @@ class MainWindow(QMainWindow):
         self.pre_layer_slider.setSingleStep(1)
         layout.addWidget(QLabel("Pre-layer:"), 11 + len(gpu_stats), 0)
         self.pre_layer_slider.setToolTip("The number of layers to allocate to the GPU. Setting this parameter enables CPU offloading for 4-bit models.")
-        layout.addWidget(self.pre_layer_slider)
+        layout.addWidget(self.pre_layer_slider, 11 + len(gpu_stats), 1)
         self.pre_layer_slider.valueChanged.connect(self.on_pre_layer_slider_changed)
 
         self.pre_layer_value_label = QLabel("0")
@@ -633,10 +651,11 @@ class MainWindow(QMainWindow):
     
     def on_cpu_radio_button_toggled(self, checked):
         # Hide/show GPU-related widgets
-        for slider, label_vram, label_gpu in zip(self.gpu_vram_sliders, self.gpu_vram_labels, self.gpu_labels):
-            slider.hide()
-            label_vram.hide()
-            label_gpu.hide()
+        if nvidia_gpu:
+            for slider, label_vram, label_gpu in zip(self.gpu_vram_sliders, self.gpu_vram_labels, self.gpu_labels):
+                slider.hide()
+                label_vram.hide()
+                label_gpu.hide()
     
         # Show RAM slider and value label
         self.ram_label.setVisible(checked)
@@ -644,16 +663,19 @@ class MainWindow(QMainWindow):
         self.ram_value_label.setVisible(checked)
     
         # Uncheck GPU and Autodevice radio buttons
-        if checked:
+        if checked and nvidia_gpu:
             self.gpu_radio_button.setChecked(False)
+            self.auto_radio_button.setChecked(False)
+        elif checked and not nvidia_gpu:
             self.auto_radio_button.setChecked(False)
     
     def on_auto_radio_button_toggled(self, checked):
         # Hide/show GPU-related widgets
-        for slider, label_vram, label_gpu in zip(self.gpu_vram_sliders, self.gpu_vram_labels, self.gpu_labels):
-            slider.hide()
-            label_vram.hide()
-            label_gpu.hide()
+        if nvidia_gpu:
+            for slider, label_vram, label_gpu in zip(self.gpu_vram_sliders, self.gpu_vram_labels, self.gpu_labels):
+                slider.hide()
+                label_vram.hide()
+                label_gpu.hide()
     
         # Hide RAM slider and value label
         self.ram_label.hide()
@@ -661,8 +683,10 @@ class MainWindow(QMainWindow):
         self.ram_value_label.hide()
     
         # Uncheck GPU and CPU radio buttons
-        if checked:
+        if checked and nvidia_gpu:
             self.gpu_radio_button.setChecked(False)
+            self.cpu_radio_button.setChecked(False)
+        elif checked and not nvidia_gpu:
             self.cpu_radio_button.setChecked(False)
 
     def on_listen_port_checkbox_changed(self, state):
@@ -753,9 +777,6 @@ class MainWindow(QMainWindow):
             command += f" --model_type {chosen_model_type}"
 
         # Add loras to the command
-#        if self.loras_checkbox.isChecked():
-#            loras = self.lora_list.item(i).text() for i in range(self.lora_list.count()) if self.lora_list.item(i).checkState() == Qt.Checked
-#            command += f" --lora {loras}"
         loras = [self.lora_list.item(i).text() for i in range(self.lora_list.count()) if self.lora_list.item(i).checkState() == Qt.Checked]
         if self.use_lora_checkbox.isChecked() and self.model_dropdown.currentText() != "none":
             if loras:
