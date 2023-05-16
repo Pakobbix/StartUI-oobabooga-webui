@@ -1,8 +1,9 @@
-import sys, gpustat, os, json, subprocess, platform, psutil, re, requests, darkdetect, qdarkstyle
-from PyQt5.QtWidgets import QApplication, QToolBar, QMessageBox, QAction, QMainWindow, QLabel, QVBoxLayout, QComboBox, QSlider, QCheckBox, QLineEdit, QFileDialog, QPushButton, QWidget, QListWidget, QListWidgetItem, QGridLayout, QRadioButton, QFrame
+import sys, os, gpustat, json, subprocess, platform, psutil, re, requests, darkdetect, qdarkstyle
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QToolBar, QMessageBox, QAction, QMainWindow, QSpinBox, QLabel, QVBoxLayout, QComboBox, QSlider, QCheckBox, QLineEdit, QFileDialog, QPushButton, QWidget, QListWidget, QListWidgetItem, QGridLayout, QRadioButton, QFrame
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QDoubleValidator, QIntValidator
 
-version = "1.3.1"
+version = "1.4"
 
 profiles_folder = "./profiles"
 os.makedirs(profiles_folder, exist_ok=True)
@@ -10,6 +11,7 @@ model_folder = "./text-generation-webui/models"
 extensions_folder = "./text-generation-webui/extensions"
 loras_folder = "./text-generation-webui/loras"
 characters_folder = "./text-generation-webui/characters"
+max_threads = psutil.cpu_count(logical=True)
 try:
     output = subprocess.check_output(['nvidia-smi'])
     nvidia_gpu = True
@@ -81,6 +83,51 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle(f'StartUI for oobabooga webui v{version}')
+        # ToolBar
+        toolbar = QToolBar()
+        toolbar.setMovable(False)
+        self.addToolBar(toolbar)
+
+        # Toolbar Label
+        toolbar_label = QLabel("Show Advanced Settings:")
+        toolbar.addWidget(toolbar_label)
+
+        # Deepspeed checkbox
+        self.deepspeed_settings_checkbox = QCheckBox("   DeepSpeed   ")
+        self.deepspeed_settings_checkbox.setChecked(False)
+        self.deepspeed_settings_checkbox.setToolTip("Enables Deepspeed Settings")
+        self.deepspeed_settings_checkbox.stateChanged.connect(self.on_deepspeed_settings_checkbox_stateChanged)
+        toolbar.addWidget(self.deepspeed_settings_checkbox)
+
+        # llama.cpp checkbox
+        self.llama_settings_checkbox = QCheckBox("   llama.cpp   ")
+        self.llama_settings_checkbox.setChecked(False)
+        self.llama_settings_checkbox.setToolTip("Enables llama.cpp Settings")
+        self.llama_settings_checkbox.stateChanged.connect(self.on_llama_settings_checkbox_stateChanged)
+        toolbar.addWidget(self.llama_settings_checkbox)
+
+        # FlexGen Checkbox
+        self.flexgen_settings_checkbox = QCheckBox("   FlexGen   ")
+        self.flexgen_settings_checkbox.setChecked(False)
+        self.flexgen_settings_checkbox.setToolTip("Enables FlexGen Settings")
+        self.flexgen_settings_checkbox.stateChanged.connect(self.on_flexgen_settings_checkbox_stateChanged)
+        toolbar.addWidget(self.flexgen_settings_checkbox)
+
+        # RWKV Checkbox
+        self.rwkv_settings_checkbox = QCheckBox("   RWKV   ")
+        self.rwkv_settings_checkbox.setChecked(False)
+        self.rwkv_settings_checkbox.setVisible(False)
+        self.rwkv_settings_checkbox.setToolTip("Enables RWKV Settings")
+        self.rwkv_settings_checkbox.stateChanged.connect(self.on_rwkv_settings_checkbox_stateChanged)
+        toolbar.addWidget(self.rwkv_settings_checkbox)
+
+        # API Checkbox
+        self.api_settings_checkbox = QCheckBox("   API   ")
+        self.api_settings_checkbox.setChecked(False)
+        self.api_settings_checkbox.setToolTip("Enables API Settings")
+        self.api_settings_checkbox.stateChanged.connect(self.on_api_settings_checkbox_stateChanged)
+        toolbar.addWidget(self.api_settings_checkbox)
+
         # Menu Bar
         menu = self.menuBar()
 
@@ -131,61 +178,101 @@ class MainWindow(QMainWindow):
 
         # Model Dropdown
         # Get the list of model folders
+        model_box = QHBoxLayout()
         model_folders = [name for name in os.listdir(model_folder) if os.path.isdir(os.path.join(model_folder, name))]
         self.model_dropdown = QComboBox()
         self.model_dropdown.addItem("none")
         self.model_dropdown.addItems(model_folders)
-        layout.addWidget(QLabel("Choose Model:"))
         self.model_dropdown.setToolTip("Select your prefered Model")
-        layout.addWidget(self.model_dropdown, 1, 0)
+        model_box.addWidget(QLabel("Choose Model:"))
+        model_box.addWidget(self.model_dropdown)
+        layout.addLayout(model_box, 0, 0)
 
+        # Reload Model Button
+        self.reload_model_button = QPushButton("Reload the Model List")
+        self.reload_model_button.setToolTip("Reloads the Names in the Models Folder")
+        self.reload_model_button.clicked.connect(self.reload_models)
+        layout.addWidget(self.reload_model_button, 0, 1, 1, 2)
+
+        # Model Type
+        model_type_box = QHBoxLayout()
+
+        # Model Type Label
+        self.model_type_text = QLabel("Model Type:")
+        model_type_box.addWidget(self.model_type_text)
+
+        # Model Type Dropdown
         self.model_type = QComboBox()
         self.model_type.addItems(["none", "llama", "opt", "gptj"])
-        layout.addWidget(QLabel("Choose Model Type:"), 3, 0)
         self.model_type.setToolTip("Select the Model Type")
-        layout.addWidget(self.model_type, 4, 0)
+        model_type_box.addWidget(self.model_type)
+        layout.addLayout(model_type_box, 1, 0)
 
+
+        # Character
+        character_box = QHBoxLayout()
+
+        # Character Text
+        self.character_text = QLabel("Character:")
+        character_box.addWidget(self.character_text)
+
+        # Character Dropdown
         self.character_to_load = QComboBox()
         character_jsons = [file for file in os.listdir(characters_folder) if file.endswith(".json")]
         without_suffix = [file.replace(".json", "") for file in character_jsons]
         self.character_to_load.addItem("none")
         self.character_to_load.addItems(without_suffix)
-        layout.addWidget(QLabel("Choose Character:"), 3, 1)
         self.character_to_load.setToolTip("Select the Character you want to load")
-        layout.addWidget(self.character_to_load, 4, 1)
+        character_box.addWidget(self.character_to_load)
+        layout.addLayout(character_box, 1, 1, 1, 2)
 
-        self.reload_model_button = QPushButton("Reload")
-        self.reload_model_button.setToolTip("Reloads the Names in the Models Folder")
-        self.reload_model_button.clicked.connect(self.reload_models)
-        layout.addWidget(QLabel("Reload the Model list:"),0, 1)
-        layout.addWidget(self.reload_model_button, 1, 1, 1 , 2)
+        # WBIT Box
+        wbit_box = QHBoxLayout()
+
+        # WBIT Label
+        self.wbit_text = QLabel("Choose WBITs:")
+        wbit_box.addWidget(self.wbit_text)
 
         # WBIT Dropdown Menu
         self.wbit_dropdown = QComboBox()
         self.wbit_dropdown.addItems(["none", "1", "2", "3", "4","8"])
-        layout.addWidget(QLabel("Choose Wbits:"),5, 0)
         self.wbit_dropdown.setToolTip("Select the bits quantization for this model\nExample: vicuna 7b 4bit you should choose 4.\nYou can keep it at none, the webui will determine it automatically if the wbits are mentioned in the name of the model")
-        layout.addWidget(self.wbit_dropdown, 6, 0)
+        wbit_box.addWidget(self.wbit_dropdown)
+        layout.addLayout(wbit_box, 2, 0)
+
+        # Groupsize box
+        groupsize_box = QHBoxLayout()
+
+        # Groupsize Label
+        self.groupsize_text = QLabel("Choose Groupsize:")
+        groupsize_box.addWidget(self.groupsize_text)
 
         # Groupsize Dropdown Menu
         self.gsize_dropdown = QComboBox()
         self.gsize_dropdown.addItems(["none", "32", "64", "128", "1024"])
-        layout.addWidget(QLabel("Choose Groupsize:"), 5, 1)
         self.gsize_dropdown.setToolTip("Select the groupsize used by the Model.\nExample: vicuna 7b 4bit-128g you should choose 128.\nYou can keep it at none, the webui will determine it automatically if the groupsize is mentioned in the name of the model")
-        layout.addWidget(self.gsize_dropdown, 6, 1, 1, 2)
+        groupsize_box.addWidget(self.gsize_dropdown)
+        layout.addLayout(groupsize_box, 2, 1, 1, 2)
 
-        # Mode Dropdown
+        # Interface Mode Box
+        interface_mode_box = QHBoxLayout()
+
+        # Interface mode label
+        self.interface_mode_text = QLabel("Interface Mode:")
+        interface_mode_box.addWidget(self.interface_mode_text)
+
+        # Interface Mode Dropdown
         self.mode_dropdown = QComboBox()
         self.mode_dropdown.addItems(["chat", "cai_chat", "notebook"])
-        layout.addWidget(QLabel("Choose Mode:"), 7, 0)
-        self.mode_dropdown.setToolTip("Choose what kind of UI you want to load.")
-        layout.addWidget(self.mode_dropdown, 8, 0)
+        self.mode_dropdown.setToolTip("Choose what kind of Interface you want to load.")
+        interface_mode_box.addWidget(self.mode_dropdown)
+        layout.addLayout(interface_mode_box, 3, 0)
 
-        self.update_button = QPushButton("Update oobabooga")
+        # WebUI Update
+        self.update_button = QPushButton("Update the text-generation-webui")
         self.update_button.setToolTip("Starts the Update Routine for the text-generation-webui")
         self.update_button.clicked.connect(self.on_update_button_clicked)
-        layout.addWidget(self.update_button, 8, 1, 1, 2)
-        layout.addWidget(QLabel("Update the text-generation-webui:"), 7, 1)
+        layout.addWidget(self.update_button, 3, 1, 1, 2)
 
         # Add horizontal line to seperate the CPU/GPU Settings
         line = QFrame()
@@ -370,41 +457,463 @@ class MainWindow(QMainWindow):
         self.choose_disk_folder_button.clicked.connect(self.on_choose_disk_folder_button_clicked)
         layout.addWidget(self.choose_disk_folder_button, 19 + len(gpu_stats), 1)
 
+        # Use sdp_attention
+        self.use_sdp_attention_checkbox = QCheckBox("Use sdp-attention")
+        self.use_sdp_attention_checkbox.setToolTip("Use torch 2.0's sdp attention.")
+        layout.addWidget(self.use_sdp_attention_checkbox, 20 + len(gpu_stats), 0)
+
+        # Use Multimodal Checkbox
+        self.use_multimodal_checkbox = QCheckBox("Multimodal")
+        self.use_multimodal_checkbox.setToolTip("Use multimodal models.")
+        layout.addWidget(self.use_multimodal_checkbox, 20 + len(gpu_stats), 1)
+
         # Add horizontal line to seperate the Checkboxes
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
         layout.addWidget(line, 21 + len(gpu_stats), 0, 1, 3)
 
+        # New GUI Options based on Toolbox Checkboxes.
+
+        # Deepspeed
+
+        # Deepspeed Header
+        self.deepspeed_label_header = QLabel("Deepspeed Options:")
+        self.deepspeed_label_header.setToolTip("Deepspeed Options")
+        layout.addWidget(self.deepspeed_label_header, 30 + len(gpu_stats), 0)
+        self.deepspeed_label_header.setVisible(False)
+
+        # Deepspeed Checkbox
+        self.deepspeed_checkbox = QCheckBox("Use Deepspeed")
+        self.deepspeed_checkbox.setToolTip("Enable the use of DeepSpeed ZeRO-3 for inference via the Transformers integration.")
+        layout.addWidget(self.deepspeed_checkbox, 31 + len(gpu_stats), 0)
+        self.deepspeed_checkbox.setVisible(False)
+
+        # Deepspeed Box
+        deepspeed_box = QHBoxLayout()
+
+        # Deepspeed GPU num Label
+        self.deepspeed_gpu_num_label = QLabel("Deepspeed GPU num:")
+        self.deepspeed_gpu_num_label.setVisible(False)
+        self.deepspeed_gpu_num_label.setToolTip("The number of GPUs to use for DeepSpeed ZeRO-3.")
+        deepspeed_box.addWidget(self.deepspeed_gpu_num_label)
+
+        # Deepspeed GPU num Spinbox
+        self.deepspeed_gpu_num_spinbox = QSpinBox()
+        self.deepspeed_gpu_num_spinbox.setVisible(False)
+        self.deepspeed_gpu_num_spinbox.setToolTip("The number of GPUs to use for DeepSpeed ZeRO-3.")
+        self.deepspeed_gpu_num_spinbox.setMinimum(1)
+        self.deepspeed_gpu_num_spinbox.setMaximum(16)
+        deepspeed_box.addWidget(self.deepspeed_gpu_num_spinbox)
+        layout.addLayout(deepspeed_box, 31 + len(gpu_stats), 1, 1, 2)
+
+        # Deepspeed use NVMe Offload Directory Checkbox
+        self.deepspeed_nvme_checkbox = QCheckBox("Use Offload Directory")
+        self.deepspeed_nvme_checkbox.setVisible(False)
+        self.deepspeed_nvme_checkbox.setToolTip("Use an NVMe offload directory for ZeRO-3.")
+        layout.addWidget(self.deepspeed_nvme_checkbox, 32 + len(gpu_stats), 0)
+        self.deepspeed_nvme_checkbox.stateChanged.connect(self.on_deepspeed_nvme_checkbox_changed)
+
+        # NVMe offload Directory
+        self.deepspeed_nvme_label = QLabel("NVMe Offload Directory:")
+        self.deepspeed_nvme_label.setVisible(False)
+        self.deepspeed_nvme_label.setToolTip("Directory to use for ZeRO-3 NVME offloading.")
+        layout.addWidget(self.deepspeed_nvme_label, 33 + len(gpu_stats), 0)
+
+        # NVMe Current Offload Directory
+        self.offload_directory = "none"
+        self.deepspeed_nvme_current_label = QLabel(f"Current Directory: {self.offload_directory}")
+        self.deepspeed_nvme_current_label.setVisible(False)
+        self.deepspeed_nvme_current_label.setToolTip("The current NVMe offload directory.")
+        layout.addWidget(self.deepspeed_nvme_current_label, 33 + len(gpu_stats), 1)
+
+        # NVMe Offload Directory folder choose
+        self.deepspeed_nvme_button = QPushButton("Choose Folder")
+        self.deepspeed_nvme_button.setVisible(False)
+        self.deepspeed_nvme_button.setToolTip("Choose a folder to use for the NVMe offload.")
+        self.deepspeed_nvme_button.clicked.connect(self.on_deepspeed_nvme_button_clicked)
+        layout.addWidget(self.deepspeed_nvme_button, 34 + len(gpu_stats), 1)
+
+        # Local Rank
+        self.deepspeed_local_rank_label = QLabel("Local Rank:")
+        self.deepspeed_local_rank_label.setVisible(False)
+        self.deepspeed_local_rank_label.setToolTip("Optional argument for distributed setups.")
+        layout.addWidget(self.deepspeed_local_rank_label, 35 + len(gpu_stats), 0)
+
+        # Local Rank SpinBox
+        self.deepspeed_local_rank_spinbox = QSpinBox()
+        self.deepspeed_local_rank_spinbox.setVisible(False)
+        self.deepspeed_local_rank_spinbox.setToolTip("Optional argument for distributed setups.")
+        self.deepspeed_local_rank_spinbox.setMinimum(0)
+        layout.addWidget(self.deepspeed_local_rank_spinbox, 35 + len(gpu_stats), 1)
+
+        # Add horizontal line to seperate the Checkboxes
+        self.deepspeed_line = QFrame()
+        self.deepspeed_line.setFrameShape(QFrame.HLine)
+        self.deepspeed_line.setFrameShadow(QFrame.Sunken)
+        self.deepspeed_line.setVisible(False)
+        layout.addWidget(self.deepspeed_line, 36 + len(gpu_stats), 0, 1, 3)
+
+        # llama.cpp
+
+        # llama.cpp Header
+        self.llama_label_header = QLabel("llama.cpp Options:")
+        self.llama_label_header.setToolTip("llama.cpp Options")
+        layout.addWidget(self.llama_label_header, 40 + len(gpu_stats), 0)
+        self.llama_label_header.setVisible(False)
+
+        # llama.cpp threads box
+        llama_threads_box = QHBoxLayout()
+
+        # llama.cpp threads
+        self.llama_threads_label = QLabel("Threads:")
+        self.llama_threads_label.setVisible(False)
+        self.llama_threads_label.setToolTip("Number of threads to use for llama.cpp.")
+        llama_threads_box.addWidget(self.llama_threads_label)
+
+        # llama.cpp threads number
+        self.llama_threads_spinbox = QSpinBox()
+        self.llama_threads_spinbox.setToolTip("Number of threads to use for llama.cpp.")
+        self.llama_threads_spinbox.setRange(0, max_threads)
+        self.llama_threads_spinbox.setValue(0)  # Set an initial value
+        self.llama_threads_spinbox.setVisible(False)
+        llama_threads_box.addWidget(self.llama_threads_spinbox)
+        layout.addLayout(llama_threads_box, 42 + len(gpu_stats), 0)
+
+        # llama.cpp batch size box
+        llama_batch_size_box = QHBoxLayout()
+
+        # llama.cpp batch size
+        self.llama_batch_size_label = QLabel("Batch Size:")
+        self.llama_batch_size_label.setVisible(False)
+        self.llama_batch_size_label.setToolTip("Maximum number of prompt tokens to batch together when calling llama_eval.")
+        llama_batch_size_box.addWidget(self.llama_batch_size_label)
+
+        # llama.cpp batch size number
+        self.llama_batch_size_spinbox = QSpinBox()
+        self.llama_batch_size_spinbox.setToolTip("Maximum number of prompt tokens to batch together when calling llama_eval.")
+        self.llama_batch_size_spinbox.setRange(4, 8192)
+        self.llama_batch_size_spinbox.setValue(512)
+        self.llama_batch_size_spinbox.setSingleStep(4)
+        self.llama_batch_size_spinbox.setVisible(False)
+        llama_batch_size_box.addWidget(self.llama_batch_size_spinbox)
+        layout.addLayout(llama_batch_size_box, 42 + len(gpu_stats), 1, 1, 2)
+
+        # llama.cpp mmap checkbox
+        self.llama_mmap_checkbox = QCheckBox("Use no mmap")
+        self.llama_mmap_checkbox.setToolTip("Prevent mmap from being used.")
+        layout.addWidget(self.llama_mmap_checkbox, 44 + len(gpu_stats), 0)
+        self.llama_mmap_checkbox.setVisible(False)
+
+        # llama mlock checkbox
+        self.llama_mlock_checkbox = QCheckBox("Use mlock")
+        self.llama_mlock_checkbox.setToolTip("Force the system to keep the model in RAM.")
+        layout.addWidget(self.llama_mlock_checkbox, 44 + len(gpu_stats), 1)
+        self.llama_mlock_checkbox.setVisible(False)
+
+        # llama.cpp cache capacity box
+        llama_cache_capacity_box = QHBoxLayout()
+
+        # llama Cache Capacity Spinbox
+        self.llama_cache_capacity_label = QLabel("Cache Capacity:")
+        self.llama_cache_capacity_label.setVisible(False)
+        self.llama_cache_capacity_label.setToolTip("Maximum number of prompt tokens to cache in RAM.")
+        llama_cache_capacity_box.addWidget(self.llama_cache_capacity_label)
+
+        # llama Cache Capacity Spinbox
+        self.llama_cache_capacity_spinbox = QSpinBox()
+        self.llama_cache_capacity_spinbox.setToolTip("Maximum number of prompt tokens to cache in RAM.")
+        self.llama_cache_capacity_spinbox.setRange(0, 8192)
+        self.llama_cache_capacity_spinbox.setValue(1024)
+        self.llama_cache_capacity_spinbox.setSingleStep(4)
+        self.llama_cache_capacity_spinbox.setVisible(False)
+        llama_cache_capacity_box.addWidget(self.llama_cache_capacity_spinbox)
+
+        # llama.cpp Cache Capacity Units
+        self.llama_cache_capacity_units = QComboBox()
+        self.llama_cache_capacity_units.setToolTip("Choose the Units to use")
+        self.llama_cache_capacity_units.addItems(["MiB", "GiB"])
+        self.llama_cache_capacity_units.setVisible(False)
+        llama_cache_capacity_box.addWidget(self.llama_cache_capacity_units)
+        layout.addLayout(llama_cache_capacity_box, 45 + len(gpu_stats), 0)
+
+        # GPU Layer Box
+        self.llama_gpu_layer_box = QHBoxLayout()
+
+        # llama GPU Layer Label
+        self.llama_gpu_layer_label = QLabel("GPU Layer:")
+        self.llama_gpu_layer_label.setVisible(False)
+        self.llama_gpu_layer_label.setToolTip("Number of layers to offload to the GPU.")
+        self.llama_gpu_layer_box.addWidget(self.llama_gpu_layer_label)
+
+        # llama GPU Layer Number
+        self.llama_gpu_layer_spinbox = QSpinBox()
+        self.llama_gpu_layer_spinbox.setToolTip("Number of layers to offload to the GPU.\nTo Offload all to GPU set it to 200.000 (MAX)")
+        self.llama_gpu_layer_spinbox.setRange(0, 200000)
+        self.llama_gpu_layer_spinbox.setValue(0)
+        self.llama_gpu_layer_spinbox.setSingleStep(1)
+        self.llama_gpu_layer_spinbox.setVisible(False)
+        self.llama_gpu_layer_box.addWidget(self.llama_gpu_layer_spinbox)
+        layout.addLayout(self.llama_gpu_layer_box, 45 + len(gpu_stats), 1, 1, 2)
+
+        # Seperator for the Toolbox Options
+        self.llama_line = QFrame()
+        self.llama_line.setFrameShape(QFrame.HLine)
+        self.llama_line.setFrameShadow(QFrame.Sunken)
+        self.llama_line.setVisible(False)
+        layout.addWidget(self.llama_line, 46 + len(gpu_stats), 0, 1, 3)
+
+        # FlexGen Options
+
+        # FlexGen Header Label
+        self.flexgen_header_label = QLabel("FlexGen Options")
+        self.flexgen_header_label.setVisible(False)
+        self.flexgen_header_label.setToolTip("Options for FlexGen.")
+        layout.addWidget(self.flexgen_header_label, 50 + len(gpu_stats), 0)
+
+        # FlexGen Checkbox 
+        self.flexgen_checkbox = QCheckBox("Use FlexGen")
+        self.flexgen_checkbox.setToolTip("Enable the use of FlexGen offloading.")
+        self.flexgen_checkbox.setVisible(False)
+        layout.addWidget(self.flexgen_checkbox, 50 + len(gpu_stats), 0)
+        #self.flexgen_checkbox.stateChanged.connect(self.on_flexgen_checkbox_changed)
+
+        # FlexGen Percentage
+        inner_layout = QHBoxLayout()
+        self.flexgen_percentage_label = QLabel("FlexGen Percentage:")
+        #self.flexgen_percentage_label.setVisible(False)
+        self.flexgen_percentage_label.setToolTip("FlexGen: allocation percentages. Must be 6 numbers separated by spaces (default: 0, 100, 100, 0, 100, 0).\n\nthe percentage of weight on GPU\nthe percentage of weight on CPU\nthe percentage of attention cache on GPU\nthe percentage of attention cache on CPU\nthe percentage of activations on GPU\nthe percentage of activations on CPU")
+        self.flexgen_percentage_label.setVisible(False)
+        inner_layout.addWidget(self.flexgen_percentage_label)
+        
+        # FlexGen Percentage Spinbox 1
+        self.flexgen_percentage_spinbox1 = QSpinBox()
+        self.flexgen_percentage_spinbox1.setToolTip("Allocation percentages. Default: 0\nthe percentage of weight on GPU")
+        self.flexgen_percentage_spinbox1.setRange(0, 100)
+        self.flexgen_percentage_spinbox1.setValue(0)
+        self.flexgen_percentage_spinbox1.setVisible(False)
+        inner_layout.addWidget(self.flexgen_percentage_spinbox1)
+
+        # FlexGen Percentage Spinbox 2
+        self.flexgen_percentage_spinbox2 = QSpinBox()
+        self.flexgen_percentage_spinbox2.setToolTip("Allocation percentages. Default: 100.\nthe percentage of weight on CPU")
+        self.flexgen_percentage_spinbox2.setRange(0, 100)
+        self.flexgen_percentage_spinbox2.setValue(100)
+        self.flexgen_percentage_spinbox2.setVisible(False)
+        inner_layout.addWidget(self.flexgen_percentage_spinbox2)
+
+        # FlexGen Percentage Spinbox 3
+        self.flexgen_percentage_spinbox3 = QSpinBox()
+        self.flexgen_percentage_spinbox3.setToolTip("Allocation percentages. Default: 100.\nthe percentage of attention cache on GPU")
+        self.flexgen_percentage_spinbox3.setRange(0, 100)
+        self.flexgen_percentage_spinbox3.setValue(100)
+        self.flexgen_percentage_spinbox3.setVisible(False)
+        inner_layout.addWidget(self.flexgen_percentage_spinbox3)
+
+        # FlexGen Percentage Spinbox 4
+        self.flexgen_percentage_spinbox4 = QSpinBox()
+        self.flexgen_percentage_spinbox4.setToolTip("Allocation percentages. Default: 0.\nthe percentage of attention cache on CPU")
+        self.flexgen_percentage_spinbox4.setRange(0, 100)
+        self.flexgen_percentage_spinbox4.setValue(0)
+        self.flexgen_percentage_spinbox4.setVisible(False)
+        inner_layout.addWidget(self.flexgen_percentage_spinbox4)
+
+        # FlexGen Percentage Spinbox 5
+        self.flexgen_percentage_spinbox5 = QSpinBox()
+        self.flexgen_percentage_spinbox5.setToolTip("Allocation percentages. Default: 100.\nthe percentage of activations on GPU")
+        self.flexgen_percentage_spinbox5.setRange(0, 100)
+        self.flexgen_percentage_spinbox5.setValue(100)
+        self.flexgen_percentage_spinbox5.setVisible(False)
+        inner_layout.addWidget(self.flexgen_percentage_spinbox5)
+
+        # FlexGen Percentage Spinbox 6
+        self.flexgen_percentage_spinbox6 = QSpinBox()
+        self.flexgen_percentage_spinbox6.setToolTip("Allocation percentages. Default: 0.\nthe percentage of activations on CPU")
+        self.flexgen_percentage_spinbox6.setRange(0, 100)
+        self.flexgen_percentage_spinbox6.setValue(0)
+        self.flexgen_percentage_spinbox6.setVisible(False)
+        inner_layout.addWidget(self.flexgen_percentage_spinbox6)
+        layout.addLayout(inner_layout, 51 + len(gpu_stats), 0, 1, 3)
+
+        # FlexGen compression Checkbox
+        self.flexgen_compression_checkbox = QCheckBox("Use Compression")
+        self.flexgen_compression_checkbox.setToolTip("Enable the use of compression for FlexGen.")
+        self.flexgen_compression_checkbox.setVisible(False)
+        #self.flexgen_compression_checkbox.stateChanged.connect(self.on_flexgen_compression_checkbox_changed)
+        layout.addWidget(self.flexgen_compression_checkbox, 52 + len(gpu_stats), 0)
+
+        # FlexGen pin weight QLabel
+        self.flexgen_pin_weight_label = QLabel("FlexGen pin weight:")
+        self.flexgen_pin_weight_label.setVisible(False)
+        self.flexgen_pin_weight_label.setToolTip("Pin weight for FlexGen. Default: 0.")
+        layout.addWidget(self.flexgen_pin_weight_label, 53 + len(gpu_stats), 0)
+
+        # FlexGen pin weight dropdown
+        self.flexgen_pin_weight_dropdown = QComboBox()
+        self.flexgen_pin_weight_dropdown.setToolTip("Pin weight for FlexGen. Default: 0.")
+        self.flexgen_pin_weight_dropdown.setVisible(False)
+        self.flexgen_pin_weight_dropdown.addItems(["none", "True", "False"])
+        self.flexgen_pin_weight_dropdown.setCurrentIndex(0)
+        layout.addWidget(self.flexgen_pin_weight_dropdown, 53 + len(gpu_stats), 1)
+
+        # Seperator for the Toolbox Options
+        self.flexline = QFrame()
+        self.flexline.setFrameShape(QFrame.HLine)
+        self.flexline.setFrameShadow(QFrame.Sunken)
+        self.flexline.setVisible(False)
+        layout.addWidget(self.flexline, 54 + len(gpu_stats), 0, 1, 3)
+
+        # RWKV Options
+
+        # RWKV Header
+        self.rwkv_header = QLabel("RWKV:")
+        self.rwkv_header.setVisible(False)
+        self.rwkv_header.setToolTip("RWKV: allocation percentages. Must be 6 numbers separated by spaces (default: 0, 100, 100, 0, 100, 0).")
+        layout.addWidget(self.rwkv_header, 60 + len(gpu_stats), 0)
+
+        # RWKV Checkbox
+        self.rwkv_checkbox = QCheckBox("Enable RWKV")
+        self.rwkv_checkbox.setToolTip("Enable RWKV.")
+        self.rwkv_checkbox.setVisible(False)
+        layout.addWidget(self.rwkv_checkbox, 61 + len(gpu_stats), 0)
+        #self.rwkv_checkbox.stateChanged.connect(self.on_rwkv_checkbox_changed)
+
+        # RWKV Strategy Checkbox
+        self.rwkv_strategy_checkbox = QCheckBox("Enable RWKV Strategy")
+        self.rwkv_strategy_checkbox.setToolTip("Enable RWKV Strategy.")
+        self.rwkv_strategy_checkbox.setVisible(False)
+        layout.addWidget(self.rwkv_strategy_checkbox, 62 + len(gpu_stats), 0)
+        #self.rwkv_strategy_checkbox.stateChanged.connect(self.on_rwkv_strategy_checkbox_changed)
+
+        # RWKV Strategy dropdown
+        rwkv_horizontalbox = QHBoxLayout()
+
+        # Dropdown for the Strategy Modes
+        self.rwkv_strategy_dropdown = QComboBox()
+        self.rwkv_strategy_dropdown.setToolTip("If you want to use a specific RWKV Strategy, you can choose here to enter which mode and the strategy strength\"cpu fp32\" # CPU mode\n\"cuda fp16\" # GPU mode with float16 precision\n\"cuda fp16 *30 -> cpu fp32\" # GPU+CPU offloading. The higher the number after *, the higher the GPU allocation.\n\"cuda fp16i8\" # GPU mode with 8-bit precision")
+        self.rwkv_strategy_dropdown.setVisible(False)
+        self.rwkv_strategy_dropdown.addItems(["none", "cpu fp32", "cuda fp16", "cuda fp16i8"])
+        self.rwkv_strategy_dropdown.setCurrentIndex(0)
+        rwkv_horizontalbox.addWidget(self.rwkv_strategy_dropdown)
+
+        # RWKV Allocation Spinbox
+        self.rwkv_allocation_spinbox = QSpinBox()
+        self.rwkv_allocation_spinbox.setToolTip("If you want to use a specific RWKV Strategy, you can choose here to enter which mode and the strategy strength\"cpu fp32\" # CPU mode\n\"cuda fp16\" # GPU mode with float16 precision\n\"cuda fp16 *30 -> cpu fp32\" # GPU+CPU offloading. The higher the number after *, the higher the GPU allocation.\n\"cuda fp16i8\" # GPU mode with 8-bit precision")
+        self.rwkv_allocation_spinbox.setVisible(False)
+        self.rwkv_allocation_spinbox.setRange(0, 100)
+        self.rwkv_allocation_spinbox.setValue(0)
+        rwkv_horizontalbox.addWidget(self.rwkv_allocation_spinbox)
+        layout.addLayout(rwkv_horizontalbox, 62 + len(gpu_stats), 1, 1 ,2)
+
+        # RWKV Cuda Checkbox
+        self.rwkv_cuda_checkbox = QCheckBox("Enable RWKV Cuda")
+        self.rwkv_cuda_checkbox.setToolTip("Enable RWKV Cuda.")
+        self.rwkv_cuda_checkbox.setVisible(False)
+        layout.addWidget(self.rwkv_cuda_checkbox, 64 + len(gpu_stats), 0)
+
+        # Seperator for the RWKV
+        self.rwkv_line = QFrame()
+        self.rwkv_line.setFrameShape(QFrame.HLine)
+        self.rwkv_line.setFrameShadow(QFrame.Sunken)
+        self.rwkv_line.setVisible(False)
+        layout.addWidget(self.rwkv_line, 65 + len(gpu_stats), 0, 1, 3)
+
+        # API Options
+
+        # API Header Label
+        self.api_header = QLabel("API:")
+        self.api_header.setVisible(False)
+        self.api_header.setToolTip("API: Choose the API settings to use.")
+        layout.addWidget(self.api_header, 70 + len(gpu_stats), 0)
+
+        # API Checkbox
+        self.api_checkbox = QCheckBox("Enable API")
+        self.api_checkbox.setToolTip("Enable the API extension.")
+        self.api_checkbox.setVisible(False)
+        layout.addWidget(self.api_checkbox, 71 + len(gpu_stats), 0)
+        #self.api_checkbox.stateChanged.connect(self.on_api_checkbox_changed)
+
+        # API blocking Port Checkbox
+        self.api_blocking_port_checkbox = QCheckBox("Change API Blocking Port")
+        self.api_blocking_port_checkbox.setToolTip("The listening port for the blocking API.\nDefault: 5000")
+        self.api_blocking_port_checkbox.setVisible(False)
+        layout.addWidget(self.api_blocking_port_checkbox, 72 + len(gpu_stats), 0)
+        self.api_blocking_port_checkbox.stateChanged.connect(self.on_api_blocking_port_checkbox_changed)
+
+        # API Blocking Port Spinbox
+        self.api_blocking_port_SpinBox = QSpinBox()
+        self.api_blocking_port_SpinBox.setToolTip("The listening port for the blocking API.\nDefault: 5000")
+        self.api_blocking_port_SpinBox.setVisible(False)
+        self.api_blocking_port_SpinBox.setEnabled(False)
+        self.api_blocking_port_SpinBox.setRange(0, 65535)
+        self.api_blocking_port_SpinBox.setValue(5000)
+        layout.addWidget(self.api_blocking_port_SpinBox, 72 + len(gpu_stats), 1)
+
+        # API Streaming Port Checkbox
+        self.api_streaming_port_checkbox = QCheckBox("Change API Streaming Port")
+        self.api_streaming_port_checkbox.setToolTip("The listening port for the streaming API.\nDefault: 5005")
+        self.api_streaming_port_checkbox.setVisible(False)
+        layout.addWidget(self.api_streaming_port_checkbox, 73 + len(gpu_stats), 0)
+        self.api_streaming_port_checkbox.stateChanged.connect(self.on_api_streaming_port_checkbox_changed)
+
+        # API Streaming Port Textfield
+        self.api_streaming_port_SpinBox = QSpinBox()
+        self.api_streaming_port_SpinBox.setToolTip("The listening port for the streaming API.\nDefault: 5005")
+        self.api_streaming_port_SpinBox.setVisible(False)
+        self.api_streaming_port_SpinBox.setEnabled(False)
+        self.api_streaming_port_SpinBox.setRange(0, 65535)
+        self.api_streaming_port_SpinBox.setValue(5005)
+        layout.addWidget(self.api_streaming_port_SpinBox, 73 + len(gpu_stats), 1)
+
+        # Enable Public API
+        self.api_public_checkbox = QCheckBox("Enable Public API")
+        self.api_public_checkbox.setToolTip("Create a public URL for the API using Cloudfare.")
+        self.api_public_checkbox.setVisible(False)
+        layout.addWidget(self.api_public_checkbox, 74 + len(gpu_stats), 0)
+        self.api_public_checkbox.stateChanged.connect(self.on_api_public_checkbox_changed)
+
+        # Seperator for the Toolbox Options
+        self.toolboxendline = QFrame()
+        self.toolboxendline.setFrameShape(QFrame.HLine)
+        self.toolboxendline.setFrameShadow(QFrame.Sunken)
+        self.toolboxendline.setVisible(False)
+        layout.addWidget(self.toolboxendline, 75 + len(gpu_stats), 0, 1, 3)
+
+        # Authentication Box
+        authentication_box = QHBoxLayout()
+
         # Authentication Checkbox
         self.authentication_checkbox = QCheckBox("Authentication")
         self.authentication_checkbox.setToolTip("Enable gradio authentication")
-        layout.addWidget(self.authentication_checkbox, 22 + len(gpu_stats), 0)
         self.authentication_checkbox.stateChanged.connect(self.on_authentication_checkbox_changed)
+        authentication_box.addWidget(self.authentication_checkbox)
 
         # Choose File Field
         self.choose_file_label = QLabel("Choose File:")
         self.choose_file_label.setVisible(False)
         self.choose_file_label.setToolTip("Choose a file to use for the authentication credentials. Credentials should be saved like:\nUSERNAME1:PASSWORD1\nUSERNAME2:PASSWORD2")
-        layout.addWidget(self.choose_file_label, 23 + len(gpu_stats), 0)
+        authentication_box.addWidget(self.choose_file_label)
 
         self.choose_file_button = QPushButton("Browse")
         self.choose_file_button.setVisible(False)
         self.choose_file_button.setToolTip("Choose a file to use for the authentication credentials. Credentials should be saved like:\nUSERNAME1:PASSWORD1\nUSERNAME2:PASSWORD2")
         self.choose_file_button.clicked.connect(self.on_choose_file_button_clicked)
-        layout.addWidget(self.choose_file_button, 24 + len(gpu_stats), 0)
+        authentication_box.addWidget(self.choose_file_button)
+        layout.addLayout(authentication_box, 80 + len(gpu_stats), 0, 1, 3)
 
         # Extensions Selection Menu
         self.use_extensions_checkbox = QCheckBox("Use Extensions")
         self.use_extensions_checkbox.setToolTip("Choose the extensions to be loaded.")
-        layout.addWidget(self.use_extensions_checkbox, 25 + len(gpu_stats), 0)
+        layout.addWidget(self.use_extensions_checkbox, 90 + len(gpu_stats), 0)
         self.use_extensions_checkbox.stateChanged.connect(self.on_use_extensions_checkbox_changed)
 
         self.extensions_list = QListWidget()
         self.extensions_list.setToolTip("Choose the extensions to be loaded.")
-        layout.addWidget(self.extensions_list, 25 + len(gpu_stats), 1, 1, 2)
+        layout.addWidget(self.extensions_list, 90 + len(gpu_stats), 1, 1, 2)
+        self.extensions_list.setFixedHeight(150)
         self.extensions_list.setVisible(False)
-        extensions = [name for name in os.listdir(extensions_folder) if os.path.isdir(os.path.join(extensions_folder, name))]
+        extensions = [name for name in os.listdir(extensions_folder) if os.path.isdir(os.path.join(extensions_folder, name)) and "api" not in name.lower()]
+        extensions.sort()
 
         for extension in extensions:
             item = QListWidgetItem(extension)
@@ -415,12 +924,12 @@ class MainWindow(QMainWindow):
         # Lora selection menu
         self.use_lora_checkbox = QCheckBox("Use Loras")
         self.use_lora_checkbox.setToolTip("Choose the loras to be loaded.")
-        layout.addWidget(self.use_lora_checkbox, 26 + len(gpu_stats), 0)
+        layout.addWidget(self.use_lora_checkbox, 100 + len(gpu_stats), 0)
         self.use_lora_checkbox.stateChanged.connect(self.on_use_lora_checkbox_changed)
 
         self.lora_list = QListWidget()
         self.lora_list.setToolTip("Choose the loras to be loaded.")
-        layout.addWidget(self.lora_list, 26 + len(gpu_stats), 1, 1, 2)
+        layout.addWidget(self.lora_list, 100 + len(gpu_stats), 1, 1, 2)
         self.lora_list.setVisible(False)
         
         loras = [name for name in os.listdir(loras_folder) if os.path.isdir(os.path.join(loras_folder, name))]
@@ -433,69 +942,161 @@ class MainWindow(QMainWindow):
         # Use Whole Local Network
         self.use_network_checkbox = QCheckBox("Local Network Mode")
         self.use_network_checkbox.setToolTip("By default, the WebUI will only be reachable by the PC running it.\nIf you want to use it also on other devices, check this")
-        layout.addWidget(self.use_network_checkbox, 30 + len(gpu_stats), 0)
+        layout.addWidget(self.use_network_checkbox, 110 + len(gpu_stats), 0)
+
+        # Use Automatically opens the Browser when finished loading the webui
+        self.use_autolaunch_checkbox = QCheckBox("Auto open Browser")
+        self.use_autolaunch_checkbox.setToolTip("Automatically Opens your browser when loading is finished")
+        layout.addWidget(self.use_autolaunch_checkbox, 120 + len(gpu_stats), 0)
     
         # Listen Port Checkbox and Text Field
         self.listen_port_checkbox = QCheckBox("Listen Port")
         self.listen_port_checkbox.setToolTip("Choose the Port to use for the WebUI.\nDefault is 7680. If you want to use Stable Diffusion at the same time,\nor got other services running on this Port, you can change it in the textfield.")
         self.listen_port_checkbox.stateChanged.connect(self.on_listen_port_checkbox_changed)
-        layout.addWidget(self.listen_port_checkbox, 30 + len(gpu_stats), 1)
+        layout.addWidget(self.listen_port_checkbox, 130 + len(gpu_stats), 1)
     
-        self.listen_port_textfield = QLineEdit()
-        self.listen_port_textfield.setPlaceholderText("Enter port number")
-        self.listen_port_textfield.setEnabled(False)
-        layout.addWidget(self.listen_port_textfield, 31 + len(gpu_stats), 1)
-    
-        # Use Automatically opens the Browser when finished loading the webui
-        self.use_autolaunch_checkbox = QCheckBox("Auto open Browser")
-        self.use_autolaunch_checkbox.setToolTip("Automatically Opens your browser when loading is finished")
-        layout.addWidget(self.use_autolaunch_checkbox, 32 + len(gpu_stats), 0)
-
         # Auto Close the GUI when pressing start.
         self.use_autoclose_checkbox = QCheckBox("Close GUI on Start")
         self.use_autoclose_checkbox.setToolTip("Auto Close the GUI when pressing start button.")
-        layout.addWidget(self.use_autoclose_checkbox, 32 + len(gpu_stats), 1)
-    
-        central_widget = QWidget()
-        central_widget.setLayout(layout)
-        self.setCentralWidget(central_widget)
+        layout.addWidget(self.use_autoclose_checkbox, 130 + len(gpu_stats), 0)
+
+        self.listen_port_textfield = QLineEdit()
+        self.listen_port_textfield.setPlaceholderText("Enter port number")
+        self.listen_port_textfield.setEnabled(False)
+        layout.addWidget(self.listen_port_textfield, 140 + len(gpu_stats), 1)
 
         self.start_button = QPushButton("Start")
         self.start_button.setToolTip("Starts the Webui with the settings set by this GUI")
         self.start_button.clicked.connect(self.on_start_button_clicked)
-        layout.addWidget(self.start_button, 33 + len(gpu_stats), 0)
+        layout.addWidget(self.start_button, 140 + len(gpu_stats), 0)
 
         self.save_button = QPushButton("Save Settings")
         self.save_button.setToolTip("You can Save your current Settings. Neat, isn't it?")
         self.save_button.clicked.connect(self.on_save_button_clicked)
-        layout.addWidget(self.save_button, 34 + len(gpu_stats), 0)
+        layout.addWidget(self.save_button, 150 + len(gpu_stats), 0)
 
-        # Textfield for the Profile Name
-        self.profile_name_textfield = QLineEdit()
-        self.profile_name_textfield.setPlaceholderText("Enter Name for the Profile, keep empty to overwrite default")
-        self.profile_name_textfield.setToolTip("You can leave this blank, then only the default profile will be overwritten. If you want to get some organizing done, you can name it. For example:\nProfile for RP\nProfile for Chat\nProfile for coding\nProfile for Superbooga\nERROR: 404 no limits found")
-        layout.addWidget(self.profile_name_textfield, 35 + len(gpu_stats), 0)
-
-        # Profiles Dropdown
-        self.profiles_dropdown = QComboBox()
-        self.populate_profiles_dropdown()
-        self.profiles_dropdown.setToolTip("Here you can choose which profile you want to load. Choose, Load, Profit.")
-        layout.addWidget(QLabel("Choose Profile:"), 33 + len(gpu_stats), 1)
-        layout.addWidget(self.profiles_dropdown, 35 + len(gpu_stats), 1)
-    
         # Load Button
         self.load_button = QPushButton("Load")
         self.load_button.setToolTip("It's a button. That loads a selected Profile. Sometimes, I'm just create explaining things.")
         self.load_button.clicked.connect(self.on_load_button_clicked)
-        layout.addWidget(self.load_button, 34 + len(gpu_stats), 1)
+        layout.addWidget(self.load_button, 150 + len(gpu_stats), 1)
 
         # Show if Update is available
         self.update_button_ui = QPushButton("Update\nAvailable")
         self.update_button_ui.setToolTip("Shows if an update is available")
         self.update_button_ui.setStyleSheet("QPushButton { color: #ff9999; font-weight: bold; }")
         self.update_button_ui.clicked.connect(self.on_update_button_ui_clicked)
-        layout.addWidget(self.update_button_ui, 34 + len(gpu_stats), 2, 2, 2)
+        layout.addWidget(self.update_button_ui, 150 + len(gpu_stats), 2, 2, 2)
         self.update_button_ui.setVisible(False)
+
+        # Textfield for the Profile Name
+        self.profile_name_textfield = QLineEdit()
+        self.profile_name_textfield.setPlaceholderText("Enter Name for the Profile, keep empty to overwrite default")
+        self.profile_name_textfield.setToolTip("You can leave this blank, then only the default profile will be overwritten. If you want to get some organizing done, you can name it. For example:\nProfile for RP\nProfile for Chat\nProfile for coding\nProfile for Superbooga\nERROR: 404 no limits found")
+        layout.addWidget(self.profile_name_textfield, 151 + len(gpu_stats), 0)
+
+        # Profiles Dropdown
+        self.profiles_dropdown = QComboBox()
+        self.populate_profiles_dropdown()
+        #self.profiles_dropdown.setPlaceholderText("Choose Profile to load")
+        self.profiles_dropdown.setToolTip("Here you can choose which profile you want to load. Choose, Load, Profit.")
+        #layout.addWidget(QLabel("Choose Profile:"), 84 + len(gpu_stats), 1)
+        layout.addWidget(self.profiles_dropdown, 151 + len(gpu_stats), 1)
+    
+        central_widget = QWidget()
+        central_widget.setLayout(layout)
+        self.setCentralWidget(central_widget)
+
+
+    def on_api_public_checkbox_changed(self, state):
+        self.api_streaming_port_SpinBox.setEnabled(False)
+        self.api_blocking_port_SpinBox.setEnabled(False)
+
+    def on_api_streaming_port_checkbox_changed(self, state):
+        if not self.api_public_checkbox.isChecked() and self.api_checkbox.isChecked():
+            self.api_streaming_port_SpinBox.setEnabled(state == Qt.Checked)
+
+    def on_api_blocking_port_checkbox_changed(self, state):
+        if not self.api_public_checkbox.isChecked() and self.api_checkbox.isChecked():
+            self.api_blocking_port_SpinBox.setEnabled(state == Qt.Checked)
+
+    def on_api_settings_checkbox_stateChanged(self, state):
+        self.api_header.setVisible(state == Qt.Checked)
+        self.api_checkbox.setVisible(state == Qt.Checked)
+        self.api_blocking_port_checkbox.setVisible(state == Qt.Checked)
+        self.api_blocking_port_SpinBox.setVisible(state == Qt.Checked)
+        self.api_streaming_port_checkbox.setVisible(state == Qt.Checked)
+        self.api_streaming_port_SpinBox.setVisible(state == Qt.Checked)
+        self.api_public_checkbox.setVisible(state == Qt.Checked)
+        self.toolboxendline.setVisible(state == Qt.Checked)
+
+    def on_rwkv_settings_checkbox_stateChanged(self, state):
+        self.rwkv_header.setVisible(state == Qt.Checked)
+        self.rwkv_checkbox.setVisible(state == Qt.Checked)
+        self.rwkv_strategy_checkbox.setVisible(state == Qt.Checked)
+        self.rwkv_strategy_dropdown.setVisible(state == Qt.Checked)
+        self.rwkv_allocation_spinbox.setVisible(state == Qt.Checked)
+        self.rwkv_cuda_checkbox.setVisible(state == Qt.Checked)
+        self.rwkv_line.setVisible(state == Qt.Checked)
+
+    def on_flexgen_settings_checkbox_stateChanged(self, state):
+        self.flexgen_header_label.setVisible(state == Qt.Checked)
+        self.flexgen_checkbox.setVisible(state == Qt.Checked)
+        self.flexgen_percentage_label.setVisible(state == Qt.Checked)
+        self.flexgen_percentage_spinbox1.setVisible(state == Qt.Checked)
+        self.flexgen_percentage_spinbox2.setVisible(state == Qt.Checked)
+        self.flexgen_percentage_spinbox3.setVisible(state == Qt.Checked)
+        self.flexgen_percentage_spinbox4.setVisible(state == Qt.Checked)
+        self.flexgen_percentage_spinbox5.setVisible(state == Qt.Checked)
+        self.flexgen_percentage_spinbox6.setVisible(state == Qt.Checked)
+        self.flexgen_compression_checkbox.setVisible(state == Qt.Checked)
+        self.flexgen_pin_weight_label.setVisible(state == Qt.Checked)
+        self.flexgen_pin_weight_dropdown.setVisible(state == Qt.Checked)
+        self.flexline.setVisible(state == Qt.Checked)
+        #self.flexgen_line.setVisible(state == Qt.Checked)
+        #self.flexgen_line.setVisible(state == Qt.Checked)
+
+    def on_llama_settings_checkbox_stateChanged(self, state):
+        self.llama_label_header.setVisible(state == Qt.Checked)
+        self.llama_threads_spinbox.setVisible(state == Qt.Checked)
+        self.llama_threads_label.setVisible(state == Qt.Checked)
+        self.llama_batch_size_label.setVisible(state == Qt.Checked)
+        self.llama_batch_size_spinbox.setVisible(state == Qt.Checked)
+        self.llama_mmap_checkbox.setVisible(state == Qt.Checked)
+        self.llama_mlock_checkbox.setVisible(state == Qt.Checked)
+        self.llama_cache_capacity_label.setVisible(state == Qt.Checked)
+        self.llama_cache_capacity_spinbox.setVisible(state == Qt.Checked)
+        self.llama_line.setVisible(state == Qt.Checked)
+        self.llama_gpu_layer_label.setVisible(state == Qt.Checked)
+        self.llama_gpu_layer_spinbox.setVisible(state == Qt.Checked)
+        self.llama_cache_capacity_units.setVisible(state == Qt.Checked)
+
+    def on_deepspeed_nvme_button_clicked(self):
+        folder = QFileDialog.getExistingDirectory(self, "Offload Directory")
+        if folder:
+            self.selected_offload_directory = folder
+            self.deepspeed_nvme_current_label.setText(f"Current Directory Folder: {self.selected_offload_directory}")
+
+#    def on_deepspeed_nvme_button_clicked(self):
+ #       folder = QFileDialog.getExistingDirectory(self, "Offload Directory")
+   #     if folder:
+  #          self.offload_directory = folder
+    #        self.deepspeed_nvme_current_label.setText(f"Current Directory Folder: {self.offload_directory}")
+
+    def on_deepspeed_nvme_checkbox_changed(self, state):
+        self.deepspeed_nvme_label.setVisible(state == Qt.Checked)
+        self.deepspeed_nvme_current_label.setVisible(state == Qt.Checked)
+        self.deepspeed_nvme_button.setVisible(state == Qt.Checked)
+
+    def on_deepspeed_settings_checkbox_stateChanged(self, state):
+        self.deepspeed_label_header.setVisible(state == Qt.Checked)
+        self.deepspeed_checkbox.setVisible(state == Qt.Checked)
+        self.deepspeed_local_rank_label.setVisible(state == Qt.Checked)
+        self.deepspeed_local_rank_spinbox.setVisible(state == Qt.Checked)
+        self.deepspeed_line.setVisible(state == Qt.Checked)
+        self.deepspeed_gpu_num_label.setVisible(state == Qt.Checked)
+        self.deepspeed_gpu_num_spinbox.setVisible(state == Qt.Checked)
+        self.deepspeed_nvme_checkbox.setVisible(state == Qt.Checked)
 
     def on_update_button_ui_clicked(self):
         self.show_version_window()
@@ -581,7 +1182,7 @@ class MainWindow(QMainWindow):
 
     def show_about_window(self, action):
         latest_version = self.get_latest_version()
-        release_url = f"https://github.com/Pakobbix/StartUI-oobabooga-webui/releases/tag/{latest_version}"
+        release_url = f"https://github.com/Pakobbix/StartUI-oobabself.offload_directoryooga-webui/releases/tag/{latest_version}"
         if latest_version and latest_version > version:
             about_text = f"A new version ({latest_version}) is available! Please <a href='{release_url}'>update.</a> <br><br>StartUI for oobabooga's webui.<br><br> Current Version: {version}<br><br>This is an GUI (Graphical User Interface), to set flags depending on the user selection."
         else:
@@ -598,7 +1199,15 @@ class MainWindow(QMainWindow):
     def on_use_disk_checkbox_changed(self, state):
         self.change_disk_cache_checkbox.setVisible(state == Qt.Checked)
         self.current_disk_cache_label.setVisible(state == Qt.Checked)
-    
+
+        if not self.use_disk_checkbox.isChecked():
+            self.choose_disk_folder_label.setVisible(False)
+            self.choose_disk_folder_button.setVisible(False)
+
+        if self.use_disk_checkbox.isChecked() and self.change_disk_cache_checkbox.isChecked():
+            self.choose_disk_folder_label.setVisible(True)
+            self.choose_disk_folder_button.setVisible(True)
+
         if state == Qt.Checked:
             # Check if disk cache path is empty
             if not self.disk_cache_path:
@@ -738,6 +1347,45 @@ class MainWindow(QMainWindow):
             "trust_remote_code": self.use_trc_checkbox.isChecked(), # Saves the state of the trust_remote_code checkbox
             "monkeypatch": self.use_monkey_checkbox.isChecked(), # Saves the state of the monkeypatch checkbox
             "quant_attn": self.use_quant_checkbox.isChecked(), # Saves the state of the quant_attn checkbox
+            "multimodal": self.use_multimodal_checkbox.isChecked(), # Saves the state of the multimodal checkbox
+            "sdp_attention": self.use_sdp_attention_checkbox.isChecked(), # Saves the state of the sdp_attention checkbox
+            "deepspeed": self.deepspeed_settings_checkbox.isChecked(), # Saves the state of the deepspeed checkbox
+            "deepspeed_enabled": self.deepspeed_checkbox.isChecked(), # Saves the state of the deepspeed checkbox
+            "deepspeed_gpu_num": self.deepspeed_gpu_num_spinbox.value(), # Saves the state of the deepspeed_gpu_num_spinbox
+            "deepspeed_nvme_enabled": self.deepspeed_nvme_checkbox.isChecked(), # Saves the state of the deepspeed_nvme_checkbox
+            "deepspeed_nvme_path": self.selected_offload_directory, # Saves the state of the offload_directory
+            "deepspeed_local_rank": self.deepspeed_local_rank_spinbox.value(), # Saves the state of the deepspeed_local_rank_spinbox
+            "llama_settings": self.llama_settings_checkbox.isChecked(), # Saves the state of the llama_settings_checkbox
+            "llama_threads": self.llama_threads_spinbox.value(), # Saves the state of the llama_threads_spinbox
+            "llama_batch_size": self.llama_batch_size_spinbox.value(), # Saves the state of the llama_batch_size_spinbox
+            "llama_no_map": self.llama_mmap_checkbox.isChecked(), # Saves the state of the llama_no_map_checkbox
+            "llama_use_mlock": self.llama_mlock_checkbox.isChecked(), # Saves the state of the llama_mlock_checkbox
+            "llama_cache_capacity": self.llama_cache_capacity_spinbox.value(), # Saves the state of the llama_cache_capacity_spinbox
+            "llama_cache_units": self.llama_cache_capacity_units.currentText(), # Saves the state of the llama_cache_capacity_units
+            "llama_gpu_layer": self.llama_gpu_layer_spinbox.value(), # Saves the state of the llama_gpu_layer_spinbox
+            "flexgen_settings": self.flexgen_settings_checkbox.isChecked(), # Saves the state of the flexgen_settings_checkbox
+            "use_flexgen": self.flexgen_checkbox.isChecked(), # Saves the state of the flexgen_checkbox
+            "flexgen_precentage_1": self.flexgen_percentage_spinbox1.value(), # Saves the state of the flexgen_percentage_spinbox1
+            "flexgen_precentage_2": self.flexgen_percentage_spinbox2.value(), # Saves the state of the flexgen_percentage_spinbox2
+            "flexgen_precentage_3": self.flexgen_percentage_spinbox3.value(), # Saves the state of the flexgen_percentage_spinbox3
+            "flexgen_precentage_4": self.flexgen_percentage_spinbox4.value(), # Saves the state of the flexgen_percentage_spinbox4
+            "flexgen_precentage_5": self.flexgen_percentage_spinbox5.value(), # Saves the state of the flexgen_percentage_spinbox5
+            "flexgen_precentage_6": self.flexgen_percentage_spinbox6.value(), # Saves the state of the flexgen_percentage_spinbox6
+            "flexgen_compression": self.flexgen_compression_checkbox.isChecked(), # Saves the state of the flexgen_compression_checkbox
+            "flexgen_pin_weight": self.flexgen_pin_weight_dropdown.currentText(), # Saves the state of the flexgen_pin_weight_dropdown
+            "rwkv_settings": self.rwkv_settings_checkbox.isChecked(), # Saves the state of the rwkv_settings_checkbox
+            "use_rwkv": self.rwkv_checkbox.isChecked(), # Saves the state of the rwkv_checkbox
+            "rwkv_strategy": self.rwkv_strategy_checkbox.isChecked(), # Saves the state of the rwkv_strategy_checkbox
+            "rwkv_strategy_dropdown": self.rwkv_strategy_dropdown.currentText(), # Saves the state of the rwkv_strategy_dropdown
+            "rwkv_allocation": self.rwkv_allocation_spinbox.value(), # Saves the state of the rwkv_allocation_spinbox
+            "rwkv_cuda": self.rwkv_cuda_checkbox.isChecked(), # Saves the state of the rwkv_cuda_checkbox
+            "api_settings": self.api_settings_checkbox.isChecked(), # Saves the state of the api_settings_checkbox
+            "use_api": self.api_checkbox.isChecked(), # Saves the state of the api_checkbox
+            "api_blocking_port_enabled": self.api_blocking_port_checkbox.isChecked(), # Saves the state of the api_blocking_port_checkbox
+            "api_blocking_port": self.api_blocking_port_SpinBox.value(), # Saves the state of the api_blocking_port_SpinBox
+            "api_streaming_port_enabled": self.api_streaming_port_checkbox.isChecked(), # Saves the state of the api_streaming_port_checkbox
+            "api_streaming_port": self.api_streaming_port_SpinBox.value(), # Saves the state of the api_streaming_port_SpinBox
+            "public_api": self.api_public_checkbox.isChecked(), # Saves the state of the api_public_checkbox
             "autotune": self.use_autotune_checkbox.isChecked(), # Saves the state of the autotune checkbox
             "autolaunch": self.use_autolaunch_checkbox.isChecked(), # Saves the state of the autotune checkbox
             "autoclose": self.use_autoclose_checkbox.isChecked(), # Saves the state of the autotune checkbox
@@ -747,13 +1395,16 @@ class MainWindow(QMainWindow):
             "port_number": self.listen_port_textfield.text(), # Saves the Port given in the Textbox
             "authentication": self.authentication_checkbox.isChecked(), # Saves the state of the Authentication
             "authentication_file": self.choose_file_label.text(),  # Save the authentication file path
-            "gpu_vram": [slider.value() for slider in self.gpu_vram_sliders], # Saves the VRAM Values
             "character": self.character_to_load.currentText(), # Saves the Characters given in the Textbox
             "use_extension": self.use_extensions_checkbox.isChecked(), # Saves the state of the Extension Checkbox
             "extensions": [self.extensions_list.item(i).text() for i in range(self.extensions_list.count()) if self.extensions_list.item(i).checkState() == Qt.Checked], # Saves the chosen Extensions
             "use_lora": self.use_lora_checkbox.isChecked(), # Saves the state of the Lora Checkbox
             "loras": [self.lora_list.item(i).text() for i in range(self.lora_list.count()) if self.lora_list.item(i).checkState() == Qt.Checked] # Saves the chosen loras
         }
+
+        if nvidia_gpu:
+            settings["gpu_vram"] = [slider.value() for slider in self.gpu_vram_sliders], # Saves the VRAM Values
+
 
         # Get the text entered in the text field
         profile_name = self.profile_name_textfield.text()
@@ -776,6 +1427,34 @@ class MainWindow(QMainWindow):
 
     def on_start_button_clicked(self):
         command = ""
+
+        # LLama Stuff
+
+        # llama.cpp threads
+
+        if self.llama_threads_spinbox.value() != 0:
+            command += f" --threads {self.llama_threads_spinbox.value()}"
+            command += f" --n_batch {self.llama_batch_size_spinbox.value()}"
+            command += f" --cache-capacity {self.llama_cache_capacity_spinbox.value()}{self.llama_cache_capacity_units.currentText()}"
+
+        if self.llama_gpu_layer_spinbox.value() != 0:
+            command += f" --n-gpu-layers {self.llama_gpu_layer_spinbox.value()}"
+
+        if self.llama_mmap_checkbox.isChecked():
+            command += " --no-map"
+
+        if self.llama_mlock_checkbox.isChecked():
+            command += " --mlock"
+
+        # FlexGen Commands
+
+        if self.flexgen_checkbox.isChecked():
+            command += " --flexgen"
+            command += f" --percent {self.flexgen_percentage_spinbox1.value()} {self.flexgen_percentage_spinbox2.value()} {self.flexgen_percentage_spinbox3.value()} {self.flexgen_percentage_spinbox4.value()} {self.flexgen_percentage_spinbox5.value()} {self.flexgen_percentage_spinbox6.value()}"
+            if self.flexgen_compression_checkbox.isChecked():
+                command += " --compression-weight"
+            if self.flexgen_pin_weight_dropdown.currentText() != "none":
+                command += f" --pin-weight {self.flexgen_pin_weight_dropdown.currentText()}"
 
         # Add the chosen model to the command
         chosen_model = self.model_dropdown.currentText()
@@ -838,6 +1517,8 @@ class MainWindow(QMainWindow):
                 error_message = "Error:\nRAM value cannot be 0 for CPU execution."
                 self.show_error_message(error_message)
                 return
+
+        # Auto Device is Activated:
         elif self.auto_radio_button.isChecked():
             command += " --auto-device"
 
@@ -888,6 +1569,10 @@ class MainWindow(QMainWindow):
         if self.use_network_checkbox.isChecked():
             command += " --listen"
 
+        # Multimodal Mode
+        if self.use_multimodal_checkbox.isChecked():
+            command += " --multimodal-pipeline"
+
         # Use Disk to store part of the Model
         if self.use_disk_checkbox.isChecked():
             command += " --disk"
@@ -910,18 +1595,47 @@ class MainWindow(QMainWindow):
         if int(self.pre_layer_value_label.text()) > 0:
             command += f" --pre_layer {self.pre_layer_value_label.text()}"
 
+        # IF sdp_attention is checked
+        if self.use_sdp_attention_checkbox.isChecked():
+            command += " --sdp-attention"
+
         # Adds the chosen extensions to the list of the command.
         extensions = [self.extensions_list.item(i).text() for i in range(self.extensions_list.count()) if self.extensions_list.item(i).checkState() == Qt.Checked]
         if self.use_extensions_checkbox.isChecked():
             if extensions:
                 command += f" --extensions {' '.join(extensions)}"
 
+        if self.api_checkbox.isChecked():
+            command += " --api"
+            if self.api_public_checkbox.isChecked():
+                command += " --public-api"
+        if self.api_checkbox.isChecked() and not self.api_public_checkbox.isChecked():
+            if self.api_blocking_port_checkbox.isChecked():
+                command += f" --api-blocking-port {self.api_blocking_port_SpinBox.text()}"
+            if self.api_streaming_port_checkbox.isChecked():
+                command += f" --api-streaming-port {self.api_streaming_port_SpinBox.text()}"
+
         # Just for debugging.
         #print(f"Command generated: python webuiGUI.py {command}")
 
         # Based on the Model that's chosen, we will take care of some necessary stuff.
         # Starts the webui in the conda env with the user given Options
-        run_cmd_with_conda(f"python webuiGUI.py {command}")
+        if self.deepspeed_checkbox.isChecked():
+            if platform.system() == "Linux":
+                gpu_number = self.deepspeed_gpu_num_spinbox.text()
+
+                deepspeed_command = f"deepspeed --num_gpus={gpu_number} ./text-generation-webui/server.py --deepspeed"
+                if self.deepspeed_nvme_checkbox.isChecked():
+                    deepspeed_command += f" --nvme-offload-dir {self.offload_directory}"
+                if self.deepspeed_local_rank_spinbox.text() != "0":
+                    deepspeed_command += f" --local_rank {self.deepspeed_local_rank_spinbox.text()}"
+                run_cmd_with_conda(f"pip install deepspeed ; clear && {deepspeed_command} {command}")
+            elif platform.system() == "Windows":
+                message = "DeepSpeed is currently not supported on Windows"
+                QMessageBox.critical(self, "Error", message)
+
+        if not self.deepspeed_checkbox.isChecked():
+            run_cmd_with_conda(f"python webuiGUI.py {command}")
 
         if self.use_autoclose_checkbox.isChecked():
             sys.exit()
@@ -976,6 +1690,46 @@ class MainWindow(QMainWindow):
         self.use_trc_checkbox.setChecked(settings.get("trust_remote_code", False))
         self.use_monkey_checkbox.setChecked(settings.get("monkeypatch", False))
         self.use_quant_checkbox.setChecked(settings.get("quant_attn", False))
+        self.use_multimodal_checkbox.setChecked(settings.get("multimodal", False))
+        self.use_sdp_attention_checkbox.setChecked(settings.get("sdp_attention", False))
+        self.deepspeed_settings_checkbox.setChecked(settings.get("deepspeed", False))
+        self.deepspeed_checkbox.setChecked(settings.get("deepspeed_enabled", False))
+        self.deepspeed_gpu_num_spinbox.setValue(int(settings.get("deepspeed_gpu_num", 0)))
+        self.selected_offload_directory = settings.get("deepspeed_nvme_path", "")
+        self.deepspeed_nvme_current_label.setText(f"Current Directory Folder: {self.selected_offload_directory}")
+        self.deepspeed_nvme_checkbox.setChecked(settings.get("deepspeed_nvme_enabled", False))
+        self.deepspeed_local_rank_spinbox.setValue(int(settings.get("deepspeed_local_rank", 0)))
+        self.llama_settings_checkbox.setChecked(settings.get("llama_settings", False))
+        self.llama_threads_spinbox.setValue(int(settings.get("llama_threads", 0)))
+        self.llama_batch_size_spinbox.setValue(int(settings.get("llama_batch_size", 0)))
+        self.llama_mmap_checkbox.setChecked(settings.get("llama_no_map", False))
+        self.llama_mlock_checkbox.setChecked(settings.get("llama_use_mlock", False))
+        self.llama_cache_capacity_spinbox.setValue(int(settings.get("llama_cache_capacity", 0)))
+        self.llama_cache_capacity_units.setCurrentText(settings.get("llama_cache_units", ""))
+        self.llama_gpu_layer_spinbox.setValue(int(settings.get("llama_gpu_layer", 0)))
+        self.flexgen_settings_checkbox.setChecked(settings.get("flexgen_settings", False))
+        self.flexgen_checkbox.setChecked(settings.get("use_flexgen", False))
+        self.flexgen_percentage_spinbox1.setValue(int(settings.get("flexgen_precentage_1", 0)))
+        self.flexgen_percentage_spinbox2.setValue(int(settings.get("flexgen_precentage_2", 100)))
+        self.flexgen_percentage_spinbox3.setValue(int(settings.get("flexgen_precentage_3", 100)))
+        self.flexgen_percentage_spinbox4.setValue(int(settings.get("flexgen_precentage_4", 0)))
+        self.flexgen_percentage_spinbox5.setValue(int(settings.get("flexgen_precentage_5", 100)))
+        self.flexgen_percentage_spinbox6.setValue(int(settings.get("flexgen_precentage_6", 0)))
+        self.flexgen_compression_checkbox.setChecked(settings.get("flexgen_compression", False))
+        self.flexgen_pin_weight_dropdown.setCurrentText(settings.get("flexgen_pin_weight", ""))
+        self.rwkv_settings_checkbox.setChecked(settings.get("rwkv_settings", False))
+        self.rwkv_checkbox.setChecked(settings.get("use_rwkv", False))
+        self.rwkv_strategy_checkbox.setChecked(settings.get("rwkv_strategy", False))
+        self.rwkv_strategy_dropdown.setCurrentText(settings.get("rwkv_strategy_dropdown", ""))
+        self.rwkv_allocation_spinbox.setValue(int(settings.get("rwkv_allocation", 0)))
+        self.rwkv_cuda_checkbox.setChecked(settings.get("rwkv_cuda", False))
+        self.api_settings_checkbox.setChecked(settings.get("api_settings", False))
+        self.api_checkbox.setChecked(settings.get("use_api", False))
+        self.api_blocking_port_checkbox.setChecked(settings.get("api_blocking_port_enabled", False))
+        self.api_blocking_port_SpinBox.setValue(int(settings.get("api_blocking_port", 5000)))
+        self.api_streaming_port_checkbox.setChecked(settings.get("api_streaming_port_enabled", False))
+        self.api_streaming_port_SpinBox.setValue(int(settings.get("api_streaming_port", 5005)))
+        self.api_public_checkbox.setChecked(settings.get("public_api", False))
         self.use_autotune_checkbox.setChecked(settings.get("autotune", False))
         self.use_autolaunch_checkbox.setChecked(settings.get("autolaunch", False))
         self.use_autoclose_checkbox.setChecked(settings.get("autoclose", False))
@@ -986,10 +1740,11 @@ class MainWindow(QMainWindow):
         self.pre_layer_slider.setValue(int(settings.get("prelayer", 0)))
         self.use_autolaunch_checkbox.setChecked(settings.get("autolaunch", False))
         self.use_network_checkbox.setChecked(settings.get("listen", False))
-        gpu_vram_settings = settings.get("gpu_vram", [])
-        for idx, slider in enumerate(self.gpu_vram_sliders):
-            if idx < len(gpu_vram_settings):
-                slider.setValue(gpu_vram_settings[idx])
+        if nvidia_gpu:
+            gpu_vram_settings = settings.get("gpu_vram", [])
+            for idx, slider in enumerate(self.gpu_vram_sliders):
+                if idx < len(gpu_vram_settings):
+                    slider.setValue(gpu_vram_settings[idx])
         self.use_extensions_checkbox.setChecked(settings.get("use_extension", False))
         extensions_settings = settings.get("extensions", [])
         for i in range(self.extensions_list.count()):
