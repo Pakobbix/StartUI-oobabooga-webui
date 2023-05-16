@@ -49,9 +49,16 @@ V1.4 :\
 <details>
   
   <summary>Screenshots</summary>
-  
-  ![image](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/0796055f-dae8-4c05-8839-ac7a006446cc)
-  ![image](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/142f2570-4b53-4198-b40b-effa0fcc5bc3)
+
+  ![1 4](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/7f252274-b20b-4e52-9789-fc45645faf03)
+
+  ![1 4 deepspeed](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/b3c566c3-bfa2-4d38-a1af-cee82bf6f5fa)
+
+  ![1 4 llama options](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/8b7bb61d-9ab5-4e54-b4e2-34ec1a36439a)
+
+  ![1 4 flexgen](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/def814cb-4f69-4a39-91cd-6731155c12a3)
+
+  ![1 4 multi settings](https://github.com/Pakobbix/StartUI-oobabooga-webui/assets/6762686/f3478ff1-bcba-4935-9e4c-efb1a2e64dcd)
 
   </details>
 
