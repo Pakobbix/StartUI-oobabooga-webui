@@ -3,21 +3,22 @@ on:
   push:
     paths:
       - .github/workflows/**
+  workflow_dispatch:
 
 jobs:
-  package-linux:
-    runs-on: ubuntu-latest
+  package:
+    runs-on: self-hosted
     strategy:
       matrix:
-        python-version: 3.x
+        os: [windows-latest, ubuntu-latest]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v3
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.x
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
@@ -33,33 +34,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: linux-binary-v1.4
-          path: dist
-
-  package-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: 3.x
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Build and package
-        run: |
-          pyinstaller --noconfirm --onefile --windowed StartUI.py
-          copy webuiGUI.py dist\  # Copy webuiGUI.py to the dist directory
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: windows-binary-v1.4
+          name: ${{ matrix.os }}-binary-v1.4
           path: dist
