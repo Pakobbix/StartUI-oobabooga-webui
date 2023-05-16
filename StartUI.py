@@ -521,8 +521,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.deepspeed_nvme_label, 33 + len(gpu_stats), 0)
 
         # NVMe Current Offload Directory
-        self.offload_directory = "none"
-        self.deepspeed_nvme_current_label = QLabel(f"Current Directory: {self.offload_directory}")
+        self.selected_offload_directory = "none"
+        self.deepspeed_nvme_current_label = QLabel(f"Current Directory: {self.selected_offload_directory}")
         self.deepspeed_nvme_current_label.setVisible(False)
         self.deepspeed_nvme_current_label.setToolTip("The current NVMe offload directory.")
         layout.addWidget(self.deepspeed_nvme_current_label, 33 + len(gpu_stats), 1)
@@ -1076,6 +1076,8 @@ class MainWindow(QMainWindow):
         if folder:
             self.selected_offload_directory = folder
             self.deepspeed_nvme_current_label.setText(f"Current Directory Folder: {self.selected_offload_directory}")
+        else:
+            self.selected_offload_directory = none
 
 #    def on_deepspeed_nvme_button_clicked(self):
  #       folder = QFileDialog.getExistingDirectory(self, "Offload Directory")
@@ -1403,8 +1405,7 @@ class MainWindow(QMainWindow):
         }
 
         if nvidia_gpu:
-            settings["gpu_vram"] = [slider.value() for slider in self.gpu_vram_sliders], # Saves the VRAM Values
-
+            settings["gpu_vram"] = [slider.value() for slider in self.gpu_vram_sliders]
 
         # Get the text entered in the text field
         profile_name = self.profile_name_textfield.text()
@@ -1740,11 +1741,13 @@ class MainWindow(QMainWindow):
         self.pre_layer_slider.setValue(int(settings.get("prelayer", 0)))
         self.use_autolaunch_checkbox.setChecked(settings.get("autolaunch", False))
         self.use_network_checkbox.setChecked(settings.get("listen", False))
+        
         if nvidia_gpu:
             gpu_vram_settings = settings.get("gpu_vram", [])
             for idx, slider in enumerate(self.gpu_vram_sliders):
                 if idx < len(gpu_vram_settings):
                     slider.setValue(gpu_vram_settings[idx])
+
         self.use_extensions_checkbox.setChecked(settings.get("use_extension", False))
         extensions_settings = settings.get("extensions", [])
         for i in range(self.extensions_list.count()):
