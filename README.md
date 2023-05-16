@@ -21,6 +21,10 @@ WebUI StartGUI is a Python graphical user interface (GUI) written with PyQT5, th
 - Save settings to a profile
 - Load profiles via Dropdown menu.
 - Run the text-generation-webui Updater
+- Character loader.
+- deepspeed Settings
+- flexgen Settings
+- API Settings
 - StartUI Update Notification
 
 ## How to Use
@@ -41,7 +45,7 @@ On Linux, you'll need to give StartUI the executable flag (`chmod +x StartUI` or
 The WebuiGUI.py must also be there, to handle the flags properly
 
 ## Screenshots
-V1.3 :\
+V1.4 :\
 <details>
   
   <summary>Screenshots</summary>
