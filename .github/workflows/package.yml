@@ -4,16 +4,12 @@ on:
     paths:
       - .github/workflows/**
 
-env:
-  PACKAGE_VERSION: v1.4
-
 jobs:
-  package-self-hosted-ubuntu:
-    runs-on: self-hosted
-    if: runner.os == 'Linux'
+  package-linux:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
+        python-version: 3.x
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -37,12 +33,11 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: linux-binary-${{ env.PACKAGE_VERSION }}
+          name: linux-binary-v1.4
           path: dist
 
-  package-self-hosted-windows:
-    runs-on: self-hosted
-    if: runner.os == 'Windows'
+  package-windows:
+    runs-on: windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -66,5 +61,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: windows-binary-${{ env.PACKAGE_VERSION }}
+          name: windows-binary-v1.4
           path: dist
