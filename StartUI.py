@@ -9,6 +9,7 @@ os.makedirs(profiles_folder, exist_ok=True)
 model_folder = "./text-generation-webui/models"
 extensions_folder = "./text-generation-webui/extensions"
 loras_folder = "./text-generation-webui/loras"
+characters_folder = "./text-generation-webui/characters"
 try:
     output = subprocess.check_output(['nvidia-smi'])
     nvidia_gpu = True
@@ -143,6 +144,15 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel("Choose Model Type:"), 3, 0)
         self.model_type.setToolTip("Select the Model Type")
         layout.addWidget(self.model_type, 4, 0)
+
+        self.character_to_load = QComboBox()
+        character_jsons = [file for file in os.listdir(characters_folder) if file.endswith(".json")]
+        without_suffix = [file.replace(".json", "") for file in character_jsons]
+        self.character_to_load.addItem("none")
+        self.character_to_load.addItems(without_suffix)
+        layout.addWidget(QLabel("Choose Character:"), 3, 1)
+        self.character_to_load.setToolTip("Select the Character you want to load")
+        layout.addWidget(self.character_to_load, 4, 1)
 
         self.reload_model_button = QPushButton("Reload")
         self.reload_model_button.setToolTip("Reloads the Names in the Models Folder")
@@ -738,6 +748,7 @@ class MainWindow(QMainWindow):
             "authentication": self.authentication_checkbox.isChecked(), # Saves the state of the Authentication
             "authentication_file": self.choose_file_label.text(),  # Save the authentication file path
             "gpu_vram": [slider.value() for slider in self.gpu_vram_sliders], # Saves the VRAM Values
+            "character": self.character_to_load.currentText(), # Saves the Characters given in the Textbox
             "use_extension": self.use_extensions_checkbox.isChecked(), # Saves the state of the Extension Checkbox
             "extensions": [self.extensions_list.item(i).text() for i in range(self.extensions_list.count()) if self.extensions_list.item(i).checkState() == Qt.Checked], # Saves the chosen Extensions
             "use_lora": self.use_lora_checkbox.isChecked(), # Saves the state of the Lora Checkbox
@@ -781,6 +792,12 @@ class MainWindow(QMainWindow):
         if self.use_lora_checkbox.isChecked() and self.model_dropdown.currentText() != "none":
             if loras:
                 command += f" --lora {' '.join(loras)}"
+
+        # Add Characters to the command
+        chosen_characters = self.character_to_load.currentText()
+        if self.character_to_load.currentText() != "none":
+            command += f" --character {chosen_characters}"
+            print(chosen_characters)
 
         # Adds wbits to the command, if not "none"
         chosen_wbits = self.wbit_dropdown.currentText()
@@ -965,6 +982,7 @@ class MainWindow(QMainWindow):
         self.use_nocache_checkbox.setChecked(settings.get("nocache", False))
         self.authentication_checkbox.setChecked(settings.get("authentication", False))
         self.choose_file_label.setText(settings.get("authentication_file", ""))
+        self.character_to_load.setCurrentText(settings.get("character", ""))
         self.pre_layer_slider.setValue(int(settings.get("prelayer", 0)))
         self.use_autolaunch_checkbox.setChecked(settings.get("autolaunch", False))
         self.use_network_checkbox.setChecked(settings.get("listen", False))
