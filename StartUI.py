@@ -3,22 +3,28 @@ from PyQt5.QtWidgets import QApplication, QHBoxLayout, QToolBar, QMessageBox, QA
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
 
-version = "1.5b"
+# For showing the current version and checking for updates
+version = "1.5"
 
+# Profile folder for loading and saving profiles.
 profiles_folder = "./profiles"
+# Create the profile folder if it doesn't exist
 os.makedirs(profiles_folder, exist_ok=True)
+
 model_folder = "./text-generation-webui/models"
 extensions_folder = "./text-generation-webui/extensions"
 loras_folder = "./text-generation-webui/loras"
 characters_folder = "./text-generation-webui/characters"
+# Get the current Max CPU threads to use, so the user can't exceed his thread count.
 max_threads = psutil.cpu_count(logical=True)
+
+# Check if Nvidia GPU and driver is installed, set boolean for later references
 try:
     output = subprocess.check_output(['nvidia-smi'])
     nvidia_gpu = True
 except:
     nvidia_gpu = False
     pass
-
 
 # # Get the absolute path of the script file
 script_path = os.path.abspath(__file__)
@@ -83,6 +89,7 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle(f'StartUI for oobabooga webui v{version}')
+
         # ToolBar
         toolbar = QToolBar()
         toolbar.setMovable(False)
@@ -172,12 +179,13 @@ class MainWindow(QMainWindow):
         report_bug_action.triggered.connect(self.on_report_bug_clicked)
         help_menu.addAction(report_bug_action)
 
+        # Main Window Layout, column width
         layout = QGridLayout()
         layout.setColumnMinimumWidth(0, 350)
         layout.setColumnMinimumWidth(3, 30)
 
         # Model Dropdown
-        # Get the list of model folders
+        # Get the list of models in models folder
         model_box = QHBoxLayout()
         model_folders = [name for name in os.listdir(model_folder) if os.path.isdir(os.path.join(model_folder, name))]
         self.model_dropdown = QComboBox()
@@ -218,6 +226,7 @@ class MainWindow(QMainWindow):
 
         # Character Dropdown
         self.character_to_load = QComboBox()
+        # get a list of all .json files in the characters folder
         character_jsons = [file for file in os.listdir(characters_folder) if file.endswith(".json")]
         without_suffix = [file.replace(".json", "") for file in character_jsons]
         self.character_to_load.addItem("none")
@@ -283,9 +292,11 @@ class MainWindow(QMainWindow):
         # GPU Checkbox and Sliders
         self.gpu_radio_button = QRadioButton("Use GPU")
         if nvidia_gpu:
+            # If nvidia_gpu is true, enable the gpu radio button
             self.gpu_radio_button.setChecked(True)
             self.gpu_radio_button.setToolTip("Choose if you want to use your GPU")
         else:
+            # If nvidia_gpu is false, disable the gpu radio button
             self.gpu_radio_button.setToolTip("AMD or Intel GPU's are currently not supported.")
             self.gpu_radio_button.setChecked(False)
             self.gpu_radio_button.setEnabled(False)
@@ -303,11 +314,13 @@ class MainWindow(QMainWindow):
         else:
             self.auto_radio_button.setChecked(True)
         layout.addWidget(self.auto_radio_button, 10, 2)
-    
+
+        # Connect the radio button to functions    
         self.gpu_radio_button.toggled.connect(self.on_gpu_radio_button_toggled)
         self.cpu_radio_button.toggled.connect(self.on_cpu_radio_button_toggled)
         self.auto_radio_button.toggled.connect(self.on_auto_radio_button_toggled)
     
+        # Get GPU Information and sliders for nvidia_gpus
         if nvidia_gpu:
             self.gpu_vram_sliders = []
             self.gpu_vram_labels = []
@@ -331,6 +344,7 @@ class MainWindow(QMainWindow):
         
                 self.gpu_vram_sliders.append(vram_slider)
         else:
+            # this is just for the layout if no nvidia_gpu is found.
             gpu_stats = [""]
 
         # Create the "Built-in RAM" label, slider, and value label
@@ -355,85 +369,108 @@ class MainWindow(QMainWindow):
         self.ram_value_label.hide()
         layout.addWidget(self.ram_value_label, 11, 2)
 
-        # Pre-layer Slider
-        self.pre_layer_slider = QSlider(Qt.Horizontal)
-        self.pre_layer_slider.setMinimum(0)
-        self.pre_layer_slider.setMaximum(100)
-        self.pre_layer_slider.setTickInterval(1)
-        self.pre_layer_slider.setSingleStep(1)
-        layout.addWidget(QLabel("Pre-layer:"), 11 + len(gpu_stats), 0)
-        self.pre_layer_slider.setToolTip("The number of layers to allocate to the GPU. Setting this parameter enables CPU offloading for 4-bit models.")
-        layout.addWidget(self.pre_layer_slider, 11 + len(gpu_stats), 1)
-        self.pre_layer_slider.valueChanged.connect(self.on_pre_layer_slider_changed)
-
-        self.pre_layer_value_label = QLabel("0")
-        layout.addWidget(self.pre_layer_value_label, 11 + len(gpu_stats), 2)
-
         # Connect the valueChanged signal of the RAM slider to update the value label
         self.ram_slider.valueChanged.connect(self.on_ram_slider_changed)
+
+        # Pre-layer Slider 
+        # Check if Nvidia_gpu is enabled, if not, we don't need multiple pre_layer slider.
+        if nvidia_gpu:
+            self.pre_layer_labels = []
+            self.pre_layer_slider = []
+            self.pre_layer_slider_value = []
+            self.pre_layer_amount_max = 100
+            # Don't get confused. With the latest changes, each GPU can have it's own pre_layer value. So we check again gpu_stats for the amount.
+            for i, gpu in enumerate(gpu_stats):
+                pre_layer_labels = QLabel(f"{gpu.name} Pre_Layer:")
+                pre_layer_labels.setToolTip(f"The number of layers to allocate to the GPU.\nSetting this parameter enables CPU offloading for 4-bit models.\nFor multi-gpu, write the numbers separated by spaces, eg --pre_layer 30 60.")
+                layout.addWidget(pre_layer_labels, 11 + (len(gpu_stats) * 2) + i, 0)
+                self.pre_layer_labels.append(pre_layer_labels)
+
+                pre_layer_sliders = QSlider(Qt.Horizontal)
+                pre_layer_sliders.setMaximum(100)
+                pre_layer_sliders.valueChanged.connect(lambda value, idx=i: self.on_pre_layer_slider_changed(value, idx))
+                layout.addWidget(pre_layer_sliders, 11 + (len(gpu_stats) * 2) + i, 1)
+                self.pre_layer_slider.append(pre_layer_sliders)
+
+                pre_layer_sliders_value = QLabel("0")
+                layout.addWidget(pre_layer_sliders_value, 11 + (len(gpu_stats) * 2) + i, 2)
+                self.pre_layer_slider_value.append(pre_layer_sliders_value)
+        else:
+            self.pre_layer_slider = QSlider(Qt.Horizontal)
+            self.pre_layer_slider.setMinimum(0)
+            self.pre_layer_slider.setMaximum(100)
+            self.pre_layer_slider.setTickInterval(1)
+            self.pre_layer_slider.setSingleStep(1)
+            layout.addWidget(QLabel("Pre-layer:"), 11 + len(gpu_stats), 0)
+            self.pre_layer_slider.setToolTip("The number of layers to allocate to the GPU. Setting this parameter enables CPU offloading for 4-bit models.")
+            layout.addWidget(self.pre_layer_slider, 11 + len(gpu_stats), 1)
+            self.pre_layer_slider.valueChanged.connect(self.on_pre_layer_slider_changed)
+
+            self.pre_layer_value_label = QLabel("0")
+            layout.addWidget(self.pre_layer_value_label, 11 + len(gpu_stats), 2)
 
         # Add horizontal line to seperate the Checkboxes
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(line, 12 + len(gpu_stats), 0, 1, 3)
+        layout.addWidget(line, 13 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # Load in 8 Bit Mode
         self.use_8bit_checkbox = QCheckBox("Load in 8bit")
         self.use_8bit_checkbox.setToolTip("VRAM Reducing!\nReduces memory usage and computational complexity at the cost of lower precision compared to higher precision representations.")
-        layout.addWidget(self.use_8bit_checkbox, 13 + len(gpu_stats), 0)
+        layout.addWidget(self.use_8bit_checkbox, 14 + (len(gpu_stats) * 2), 0)
 
         # Deactivate Streaming Output
         self.use_nostream_checkbox = QCheckBox("No Stream")
         self.use_nostream_checkbox.setToolTip("Don't stream the text output in real time. Increases Token/s by ~ 50%")
-        layout.addWidget(self.use_nostream_checkbox, 13 + len(gpu_stats), 1)
+        layout.addWidget(self.use_nostream_checkbox, 15 + (len(gpu_stats) * 2), 1)
 
         # Load in full 16bit precision
         self.use_16bit_checkbox = QCheckBox("Load in 16bit")
         self.use_16bit_checkbox.setToolTip("Load the model with bfloat16 precision. Requires NVIDIA Ampere GPU.")
-        layout.addWidget(self.use_16bit_checkbox, 14 + len(gpu_stats), 0)
+        layout.addWidget(self.use_16bit_checkbox, 15 + (len(gpu_stats) * 2), 0)
 
         # Use xformers
         self.use_xformers_checkbox = QCheckBox("xformers")
         self.use_xformers_checkbox.setToolTip("Use xformer's memory efficient attention. This should increase your tokens/s.")
-        layout.addWidget(self.use_xformers_checkbox, 14 + len(gpu_stats), 1)
+        layout.addWidget(self.use_xformers_checkbox, 15 + (len(gpu_stats) * 2), 1)
 
         # Make use of Remote Code Execution (MPT-7B)
         self.use_trc_checkbox = QCheckBox("trust-remote-code")
         self.use_trc_checkbox.setToolTip("Set trust_remote_code=True while loading a model. Necessary for ChatGLM and MPT-7B.")
-        layout.addWidget(self.use_trc_checkbox, 15 + len(gpu_stats), 0)
+        layout.addWidget(self.use_trc_checkbox, 16 + (len(gpu_stats) * 2), 0)
 
         # Load with Monkey-Patch enabled
         self.use_monkey_checkbox = QCheckBox("Monkey Patch")
         self.use_monkey_checkbox.setToolTip("Apply the monkey patch for using LoRAs with quantized models.")
-        layout.addWidget(self.use_monkey_checkbox, 15 + len(gpu_stats), 1)
+        layout.addWidget(self.use_monkey_checkbox, 16 + (len(gpu_stats) * 2), 1)
 
         # Use Triton Quant-ATTN
         self.use_quant_checkbox = QCheckBox("Quant_attn")
         self.use_quant_checkbox.setToolTip("(triton) Enable quant attention.")
-        layout.addWidget(self.use_quant_checkbox, 16 + len(gpu_stats), 0)
+        layout.addWidget(self.use_quant_checkbox, 17 + (len(gpu_stats) * 2), 0)
 
         # Use Triton Warmup & Autotune
         self.use_autotune_checkbox = QCheckBox("Warmup-Autotune")
         self.use_autotune_checkbox.setToolTip("(triton) Enable warmup autotune.")
-        layout.addWidget(self.use_autotune_checkbox, 16 + len(gpu_stats), 1)
+        layout.addWidget(self.use_autotune_checkbox, 17 + (len(gpu_stats) * 2), 1)
 
         # Disable Cache for better VRAM
         self.use_nocache_checkbox = QCheckBox("No Cache")
         self.use_nocache_checkbox.setToolTip("VRAM Reducing!\nSet use_cache to False while generating text. This reduces the VRAM usage a bit with a performance cost.")
-        layout.addWidget(self.use_nocache_checkbox, 17 + len(gpu_stats), 1)
+        layout.addWidget(self.use_nocache_checkbox, 18 + (len(gpu_stats) * 2), 1)
 
         # Use DISK to load part of the model
         self.use_disk_checkbox = QCheckBox("Use DISK")
         self.use_disk_checkbox.setToolTip("If the model is too large for your GPU(s) and CPU combined, send the remaining layers to the disk.")
-        layout.addWidget(self.use_disk_checkbox, 17 + len(gpu_stats), 0)
+        layout.addWidget(self.use_disk_checkbox, 18 + (len(gpu_stats) * 2), 0)
         self.use_disk_checkbox.stateChanged.connect(self.on_use_disk_checkbox_changed)
 
         # Use DISK to load part of the model
         self.change_disk_cache_checkbox = QCheckBox("Change Disk Cache")
         self.change_disk_cache_checkbox.setVisible(False)
         self.change_disk_cache_checkbox.setToolTip("OPTIONAL: Change the disk cache directory.")
-        layout.addWidget(self.change_disk_cache_checkbox, 18 + len(gpu_stats), 0)
+        layout.addWidget(self.change_disk_cache_checkbox, 19 + (len(gpu_stats) * 2), 0)
         self.change_disk_cache_checkbox.stateChanged.connect(self.on_change_disk_cache_checkbox_changed)
 
         # Current Cache Folder
@@ -441,13 +478,13 @@ class MainWindow(QMainWindow):
         self.current_disk_cache_label = QLabel("Current Cache Folder:")
         self.current_disk_cache_label.setVisible(False)
         self.current_disk_cache_label.setToolTip("The current disk cache folder.")
-        layout.addWidget(self.current_disk_cache_label, 18 + len(gpu_stats), 1)
+        layout.addWidget(self.current_disk_cache_label, 19 + (len(gpu_stats) * 2), 1)
 
         # Choose Folder Field
         self.choose_disk_folder_label = QLabel("Choose Folder:")
         self.choose_disk_folder_label.setVisible(False)
         self.choose_disk_folder_label.setToolTip("Choose a folder to use for the disk cache.")
-        layout.addWidget(self.choose_disk_folder_label, 19 + len(gpu_stats), 0)
+        layout.addWidget(self.choose_disk_folder_label, 20 + (len(gpu_stats) * 2), 0)
 
         # Choose Folder button
         self.choose_disk_folder_button = QPushButton("Choose Folder")
@@ -455,33 +492,33 @@ class MainWindow(QMainWindow):
         self.disk_cache_textfield = QLineEdit()
         self.choose_disk_folder_button.setToolTip("Choose a folder to use for the disk cache.")
         self.choose_disk_folder_button.clicked.connect(self.on_choose_disk_folder_button_clicked)
-        layout.addWidget(self.choose_disk_folder_button, 19 + len(gpu_stats), 1)
+        layout.addWidget(self.choose_disk_folder_button, 20 + (len(gpu_stats) * 2), 1)
 
         # Use sdp_attention
         self.use_sdp_attention_checkbox = QCheckBox("Use sdp-attention")
         self.use_sdp_attention_checkbox.setToolTip("Use torch 2.0's sdp attention.")
-        layout.addWidget(self.use_sdp_attention_checkbox, 20 + len(gpu_stats), 0)
+        layout.addWidget(self.use_sdp_attention_checkbox, 21 + (len(gpu_stats) * 2), 0)
 
         # Use Multimodal Checkbox
         self.use_multimodal_checkbox = QCheckBox("Multimodal")
         self.use_multimodal_checkbox.setToolTip("Use multimodal models.")
-        layout.addWidget(self.use_multimodal_checkbox, 20 + len(gpu_stats), 1)
+        layout.addWidget(self.use_multimodal_checkbox, 21 + (len(gpu_stats) * 2), 1)
 
         # Add autogptq checkbox
         self.use_autogptq_checkbox = QCheckBox("AutoGPTQ")
         self.use_autogptq_checkbox.setToolTip("Use AutoGPTQ for loading quantized models instead of the internal GPTQ loader.")
-        layout.addWidget(self.use_autogptq_checkbox, 21 + len(gpu_stats), 0)
+        layout.addWidget(self.use_autogptq_checkbox, 22 + (len(gpu_stats) * 2), 0)
 
         # Add Triton checkbox
         self.use_triton_checkbox = QCheckBox("Triton")
         self.use_triton_checkbox.setToolTip("Use Triton for inference.")
-        layout.addWidget(self.use_triton_checkbox, 21 + len(gpu_stats), 1)
+        layout.addWidget(self.use_triton_checkbox, 22 + (len(gpu_stats) * 2), 1)
 
         # Add horizontal line to seperate the Checkboxes
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(line, 22 + len(gpu_stats), 0, 1, 3)
+        layout.addWidget(line, 23 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # New GUI Options based on Toolbox Checkboxes.
 
@@ -490,13 +527,13 @@ class MainWindow(QMainWindow):
         # Deepspeed Header
         self.deepspeed_label_header = QLabel("Deepspeed Options:")
         self.deepspeed_label_header.setToolTip("Deepspeed Options")
-        layout.addWidget(self.deepspeed_label_header, 30 + len(gpu_stats), 0)
+        layout.addWidget(self.deepspeed_label_header, 30 + (len(gpu_stats) * 2), 0)
         self.deepspeed_label_header.setVisible(False)
 
         # Deepspeed Checkbox
         self.deepspeed_checkbox = QCheckBox("Use Deepspeed")
         self.deepspeed_checkbox.setToolTip("Enable the use of DeepSpeed ZeRO-3 for inference via the Transformers integration.")
-        layout.addWidget(self.deepspeed_checkbox, 31 + len(gpu_stats), 0)
+        layout.addWidget(self.deepspeed_checkbox, 31 + (len(gpu_stats) * 2), 0)
         self.deepspeed_checkbox.setVisible(False)
 
         # Deepspeed Box
@@ -515,61 +552,61 @@ class MainWindow(QMainWindow):
         self.deepspeed_gpu_num_spinbox.setMinimum(1)
         self.deepspeed_gpu_num_spinbox.setMaximum(16)
         deepspeed_box.addWidget(self.deepspeed_gpu_num_spinbox)
-        layout.addLayout(deepspeed_box, 31 + len(gpu_stats), 1, 1, 2)
+        layout.addLayout(deepspeed_box, 31 + (len(gpu_stats) * 2), 1, 1, 2)
 
         # Deepspeed use NVMe Offload Directory Checkbox
         self.deepspeed_nvme_checkbox = QCheckBox("Use Offload Directory")
         self.deepspeed_nvme_checkbox.setVisible(False)
         self.deepspeed_nvme_checkbox.setToolTip("Use an NVMe offload directory for ZeRO-3.")
-        layout.addWidget(self.deepspeed_nvme_checkbox, 32 + len(gpu_stats), 0)
+        layout.addWidget(self.deepspeed_nvme_checkbox, 32 + (len(gpu_stats) * 2), 0)
         self.deepspeed_nvme_checkbox.stateChanged.connect(self.on_deepspeed_nvme_checkbox_changed)
 
         # NVMe offload Directory
         self.deepspeed_nvme_label = QLabel("NVMe Offload Directory:")
         self.deepspeed_nvme_label.setVisible(False)
         self.deepspeed_nvme_label.setToolTip("Directory to use for ZeRO-3 NVME offloading.")
-        layout.addWidget(self.deepspeed_nvme_label, 33 + len(gpu_stats), 0)
+        layout.addWidget(self.deepspeed_nvme_label, 33 + (len(gpu_stats) * 2), 0)
 
         # NVMe Current Offload Directory
         self.selected_offload_directory = "none"
         self.deepspeed_nvme_current_label = QLabel(f"Current Directory: {self.selected_offload_directory}")
         self.deepspeed_nvme_current_label.setVisible(False)
         self.deepspeed_nvme_current_label.setToolTip("The current NVMe offload directory.")
-        layout.addWidget(self.deepspeed_nvme_current_label, 33 + len(gpu_stats), 1)
+        layout.addWidget(self.deepspeed_nvme_current_label, 33 + (len(gpu_stats) * 2), 1)
 
         # NVMe Offload Directory folder choose
         self.deepspeed_nvme_button = QPushButton("Choose Folder")
         self.deepspeed_nvme_button.setVisible(False)
         self.deepspeed_nvme_button.setToolTip("Choose a folder to use for the NVMe offload.")
         self.deepspeed_nvme_button.clicked.connect(self.on_deepspeed_nvme_button_clicked)
-        layout.addWidget(self.deepspeed_nvme_button, 34 + len(gpu_stats), 1)
+        layout.addWidget(self.deepspeed_nvme_button, 34 + (len(gpu_stats) * 2), 1)
 
         # Local Rank
         self.deepspeed_local_rank_label = QLabel("Local Rank:")
         self.deepspeed_local_rank_label.setVisible(False)
         self.deepspeed_local_rank_label.setToolTip("Optional argument for distributed setups.")
-        layout.addWidget(self.deepspeed_local_rank_label, 35 + len(gpu_stats), 0)
+        layout.addWidget(self.deepspeed_local_rank_label, 35 + (len(gpu_stats) * 2), 0)
 
         # Local Rank SpinBox
         self.deepspeed_local_rank_spinbox = QSpinBox()
         self.deepspeed_local_rank_spinbox.setVisible(False)
         self.deepspeed_local_rank_spinbox.setToolTip("Optional argument for distributed setups.")
         self.deepspeed_local_rank_spinbox.setMinimum(0)
-        layout.addWidget(self.deepspeed_local_rank_spinbox, 35 + len(gpu_stats), 1)
+        layout.addWidget(self.deepspeed_local_rank_spinbox, 35 + (len(gpu_stats) * 2), 1)
 
         # Add horizontal line to seperate the Checkboxes
         self.deepspeed_line = QFrame()
         self.deepspeed_line.setFrameShape(QFrame.HLine)
         self.deepspeed_line.setFrameShadow(QFrame.Sunken)
         self.deepspeed_line.setVisible(False)
-        layout.addWidget(self.deepspeed_line, 36 + len(gpu_stats), 0, 1, 3)
+        layout.addWidget(self.deepspeed_line, 36 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # llama.cpp
 
         # llama.cpp Header
         self.llama_label_header = QLabel("llama.cpp Options:")
         self.llama_label_header.setToolTip("llama.cpp Options")
-        layout.addWidget(self.llama_label_header, 40 + len(gpu_stats), 0)
+        layout.addWidget(self.llama_label_header, 40 + (len(gpu_stats) * 2), 0)
         self.llama_label_header.setVisible(False)
 
         # llama.cpp threads box
@@ -588,7 +625,7 @@ class MainWindow(QMainWindow):
         self.llama_threads_spinbox.setValue(0)  # Set an initial value
         self.llama_threads_spinbox.setVisible(False)
         llama_threads_box.addWidget(self.llama_threads_spinbox)
-        layout.addLayout(llama_threads_box, 42 + len(gpu_stats), 0)
+        layout.addLayout(llama_threads_box, 42 + (len(gpu_stats) * 2), 0)
 
         # llama.cpp batch size box
         llama_batch_size_box = QHBoxLayout()
@@ -607,18 +644,18 @@ class MainWindow(QMainWindow):
         self.llama_batch_size_spinbox.setSingleStep(4)
         self.llama_batch_size_spinbox.setVisible(False)
         llama_batch_size_box.addWidget(self.llama_batch_size_spinbox)
-        layout.addLayout(llama_batch_size_box, 42 + len(gpu_stats), 1, 1, 2)
+        layout.addLayout(llama_batch_size_box, 42 + (len(gpu_stats) * 2), 1, 1, 2)
 
         # llama.cpp mmap checkbox
         self.llama_mmap_checkbox = QCheckBox("Use no mmap")
         self.llama_mmap_checkbox.setToolTip("Prevent mmap from being used.")
-        layout.addWidget(self.llama_mmap_checkbox, 44 + len(gpu_stats), 0)
+        layout.addWidget(self.llama_mmap_checkbox, 44 + (len(gpu_stats) * 2), 0)
         self.llama_mmap_checkbox.setVisible(False)
 
         # llama mlock checkbox
         self.llama_mlock_checkbox = QCheckBox("Use mlock")
         self.llama_mlock_checkbox.setToolTip("Force the system to keep the model in RAM.")
-        layout.addWidget(self.llama_mlock_checkbox, 44 + len(gpu_stats), 1)
+        layout.addWidget(self.llama_mlock_checkbox, 44 + (len(gpu_stats) * 2), 1)
         self.llama_mlock_checkbox.setVisible(False)
 
         # llama.cpp cache capacity box
@@ -645,7 +682,7 @@ class MainWindow(QMainWindow):
         self.llama_cache_capacity_units.addItems(["MiB", "GiB"])
         self.llama_cache_capacity_units.setVisible(False)
         llama_cache_capacity_box.addWidget(self.llama_cache_capacity_units)
-        layout.addLayout(llama_cache_capacity_box, 45 + len(gpu_stats), 0)
+        layout.addLayout(llama_cache_capacity_box, 45 + (len(gpu_stats) * 2), 0)
 
         # GPU Layer Box
         self.llama_gpu_layer_box = QHBoxLayout()
@@ -664,14 +701,14 @@ class MainWindow(QMainWindow):
         self.llama_gpu_layer_spinbox.setSingleStep(1)
         self.llama_gpu_layer_spinbox.setVisible(False)
         self.llama_gpu_layer_box.addWidget(self.llama_gpu_layer_spinbox)
-        layout.addLayout(self.llama_gpu_layer_box, 45 + len(gpu_stats), 1, 1, 2)
+        layout.addLayout(self.llama_gpu_layer_box, 45 + (len(gpu_stats) * 2), 1, 1, 2)
 
         # Seperator for the Toolbox Options
         self.llama_line = QFrame()
         self.llama_line.setFrameShape(QFrame.HLine)
         self.llama_line.setFrameShadow(QFrame.Sunken)
         self.llama_line.setVisible(False)
-        layout.addWidget(self.llama_line, 46 + len(gpu_stats), 0, 1, 3)
+        layout.addWidget(self.llama_line, 46 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # FlexGen Options
 
@@ -679,13 +716,13 @@ class MainWindow(QMainWindow):
         self.flexgen_header_label = QLabel("FlexGen Options")
         self.flexgen_header_label.setVisible(False)
         self.flexgen_header_label.setToolTip("Options for FlexGen.")
-        layout.addWidget(self.flexgen_header_label, 50 + len(gpu_stats), 0)
+        layout.addWidget(self.flexgen_header_label, 50 + (len(gpu_stats) * 2), 0)
 
         # FlexGen Checkbox 
         self.flexgen_checkbox = QCheckBox("Use FlexGen")
         self.flexgen_checkbox.setToolTip("Enable the use of FlexGen offloading.")
         self.flexgen_checkbox.setVisible(False)
-        layout.addWidget(self.flexgen_checkbox, 50 + len(gpu_stats), 0)
+        layout.addWidget(self.flexgen_checkbox, 50 + (len(gpu_stats) * 2), 0)
         #self.flexgen_checkbox.stateChanged.connect(self.on_flexgen_checkbox_changed)
 
         # FlexGen Percentage
@@ -743,20 +780,20 @@ class MainWindow(QMainWindow):
         self.flexgen_percentage_spinbox6.setValue(0)
         self.flexgen_percentage_spinbox6.setVisible(False)
         inner_layout.addWidget(self.flexgen_percentage_spinbox6)
-        layout.addLayout(inner_layout, 51 + len(gpu_stats), 0, 1, 3)
+        layout.addLayout(inner_layout, 51 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # FlexGen compression Checkbox
         self.flexgen_compression_checkbox = QCheckBox("Use Compression")
         self.flexgen_compression_checkbox.setToolTip("Enable the use of compression for FlexGen.")
         self.flexgen_compression_checkbox.setVisible(False)
         #self.flexgen_compression_checkbox.stateChanged.connect(self.on_flexgen_compression_checkbox_changed)
-        layout.addWidget(self.flexgen_compression_checkbox, 52 + len(gpu_stats), 0)
+        layout.addWidget(self.flexgen_compression_checkbox, 52 + (len(gpu_stats) * 2), 0)
 
         # FlexGen pin weight QLabel
         self.flexgen_pin_weight_label = QLabel("FlexGen pin weight:")
         self.flexgen_pin_weight_label.setVisible(False)
         self.flexgen_pin_weight_label.setToolTip("Pin weight for FlexGen. Default: 0.")
-        layout.addWidget(self.flexgen_pin_weight_label, 53 + len(gpu_stats), 0)
+        layout.addWidget(self.flexgen_pin_weight_label, 53 + (len(gpu_stats) * 2), 0)
 
         # FlexGen pin weight dropdown
         self.flexgen_pin_weight_dropdown = QComboBox()
@@ -764,14 +801,14 @@ class MainWindow(QMainWindow):
         self.flexgen_pin_weight_dropdown.setVisible(False)
         self.flexgen_pin_weight_dropdown.addItems(["none", "True", "False"])
         self.flexgen_pin_weight_dropdown.setCurrentIndex(0)
-        layout.addWidget(self.flexgen_pin_weight_dropdown, 53 + len(gpu_stats), 1)
+        layout.addWidget(self.flexgen_pin_weight_dropdown, 53 + (len(gpu_stats) * 2), 1)
 
         # Seperator for the Toolbox Options
         self.flexline = QFrame()
         self.flexline.setFrameShape(QFrame.HLine)
         self.flexline.setFrameShadow(QFrame.Sunken)
         self.flexline.setVisible(False)
-        layout.addWidget(self.flexline, 54 + len(gpu_stats), 0, 1, 3)
+        layout.addWidget(self.flexline, 54 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # RWKV Options
 
@@ -779,20 +816,20 @@ class MainWindow(QMainWindow):
         self.rwkv_header = QLabel("RWKV:")
         self.rwkv_header.setVisible(False)
         self.rwkv_header.setToolTip("RWKV: allocation percentages. Must be 6 numbers separated by spaces (default: 0, 100, 100, 0, 100, 0).")
-        layout.addWidget(self.rwkv_header, 60 + len(gpu_stats), 0)
+        layout.addWidget(self.rwkv_header, 60 + (len(gpu_stats) * 2), 0)
 
         # RWKV Checkbox
         self.rwkv_checkbox = QCheckBox("Enable RWKV")
         self.rwkv_checkbox.setToolTip("Enable RWKV.")
         self.rwkv_checkbox.setVisible(False)
-        layout.addWidget(self.rwkv_checkbox, 61 + len(gpu_stats), 0)
+        layout.addWidget(self.rwkv_checkbox, 61 + (len(gpu_stats) * 2), 0)
         #self.rwkv_checkbox.stateChanged.connect(self.on_rwkv_checkbox_changed)
 
         # RWKV Strategy Checkbox
         self.rwkv_strategy_checkbox = QCheckBox("Enable RWKV Strategy")
         self.rwkv_strategy_checkbox.setToolTip("Enable RWKV Strategy.")
         self.rwkv_strategy_checkbox.setVisible(False)
-        layout.addWidget(self.rwkv_strategy_checkbox, 62 + len(gpu_stats), 0)
+        layout.addWidget(self.rwkv_strategy_checkbox, 62 + (len(gpu_stats) * 2), 0)
         #self.rwkv_strategy_checkbox.stateChanged.connect(self.on_rwkv_strategy_checkbox_changed)
 
         # RWKV Strategy dropdown
@@ -813,20 +850,20 @@ class MainWindow(QMainWindow):
         self.rwkv_allocation_spinbox.setRange(0, 100)
         self.rwkv_allocation_spinbox.setValue(0)
         rwkv_horizontalbox.addWidget(self.rwkv_allocation_spinbox)
-        layout.addLayout(rwkv_horizontalbox, 62 + len(gpu_stats), 1, 1 ,2)
+        layout.addLayout(rwkv_horizontalbox, 62 + (len(gpu_stats) * 2), 1, 1 ,2)
 
         # RWKV Cuda Checkbox
         self.rwkv_cuda_checkbox = QCheckBox("Enable RWKV Cuda")
         self.rwkv_cuda_checkbox.setToolTip("Enable RWKV Cuda.")
         self.rwkv_cuda_checkbox.setVisible(False)
-        layout.addWidget(self.rwkv_cuda_checkbox, 64 + len(gpu_stats), 0)
+        layout.addWidget(self.rwkv_cuda_checkbox, 64 + (len(gpu_stats) * 2), 0)
 
         # Seperator for the RWKV
         self.rwkv_line = QFrame()
         self.rwkv_line.setFrameShape(QFrame.HLine)
         self.rwkv_line.setFrameShadow(QFrame.Sunken)
         self.rwkv_line.setVisible(False)
-        layout.addWidget(self.rwkv_line, 65 + len(gpu_stats), 0, 1, 3)
+        layout.addWidget(self.rwkv_line, 65 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # API Options
 
@@ -834,20 +871,20 @@ class MainWindow(QMainWindow):
         self.api_header = QLabel("API:")
         self.api_header.setVisible(False)
         self.api_header.setToolTip("API: Choose the API settings to use.")
-        layout.addWidget(self.api_header, 70 + len(gpu_stats), 0)
+        layout.addWidget(self.api_header, 70 + (len(gpu_stats) * 2), 0)
 
         # API Checkbox
         self.api_checkbox = QCheckBox("Enable API")
         self.api_checkbox.setToolTip("Enable the API extension.")
         self.api_checkbox.setVisible(False)
-        layout.addWidget(self.api_checkbox, 71 + len(gpu_stats), 0)
+        layout.addWidget(self.api_checkbox, 71 + (len(gpu_stats) * 2), 0)
         #self.api_checkbox.stateChanged.connect(self.on_api_checkbox_changed)
 
         # API blocking Port Checkbox
         self.api_blocking_port_checkbox = QCheckBox("Change API Blocking Port")
         self.api_blocking_port_checkbox.setToolTip("The listening port for the blocking API.\nDefault: 5000")
         self.api_blocking_port_checkbox.setVisible(False)
-        layout.addWidget(self.api_blocking_port_checkbox, 72 + len(gpu_stats), 0)
+        layout.addWidget(self.api_blocking_port_checkbox, 72 + (len(gpu_stats) * 2), 0)
         self.api_blocking_port_checkbox.stateChanged.connect(self.on_api_blocking_port_checkbox_changed)
 
         # API Blocking Port Spinbox
@@ -857,13 +894,13 @@ class MainWindow(QMainWindow):
         self.api_blocking_port_SpinBox.setEnabled(False)
         self.api_blocking_port_SpinBox.setRange(0, 65535)
         self.api_blocking_port_SpinBox.setValue(5000)
-        layout.addWidget(self.api_blocking_port_SpinBox, 72 + len(gpu_stats), 1)
+        layout.addWidget(self.api_blocking_port_SpinBox, 72 + (len(gpu_stats) * 2), 1)
 
         # API Streaming Port Checkbox
         self.api_streaming_port_checkbox = QCheckBox("Change API Streaming Port")
         self.api_streaming_port_checkbox.setToolTip("The listening port for the streaming API.\nDefault: 5005")
         self.api_streaming_port_checkbox.setVisible(False)
-        layout.addWidget(self.api_streaming_port_checkbox, 73 + len(gpu_stats), 0)
+        layout.addWidget(self.api_streaming_port_checkbox, 73 + (len(gpu_stats) * 2), 0)
         self.api_streaming_port_checkbox.stateChanged.connect(self.on_api_streaming_port_checkbox_changed)
 
         # API Streaming Port Textfield
@@ -873,13 +910,13 @@ class MainWindow(QMainWindow):
         self.api_streaming_port_SpinBox.setEnabled(False)
         self.api_streaming_port_SpinBox.setRange(0, 65535)
         self.api_streaming_port_SpinBox.setValue(5005)
-        layout.addWidget(self.api_streaming_port_SpinBox, 73 + len(gpu_stats), 1)
+        layout.addWidget(self.api_streaming_port_SpinBox, 73 + (len(gpu_stats) * 2), 1)
 
         # Enable Public API
         self.api_public_checkbox = QCheckBox("Enable Public API")
         self.api_public_checkbox.setToolTip("Create a public URL for the API using Cloudfare.")
         self.api_public_checkbox.setVisible(False)
-        layout.addWidget(self.api_public_checkbox, 74 + len(gpu_stats), 0)
+        layout.addWidget(self.api_public_checkbox, 74 + (len(gpu_stats) * 2), 0)
         self.api_public_checkbox.stateChanged.connect(self.on_api_public_checkbox_changed)
 
         # Seperator for the Toolbox Options
@@ -887,7 +924,7 @@ class MainWindow(QMainWindow):
         self.toolboxendline.setFrameShape(QFrame.HLine)
         self.toolboxendline.setFrameShadow(QFrame.Sunken)
         self.toolboxendline.setVisible(False)
-        layout.addWidget(self.toolboxendline, 75 + len(gpu_stats), 0, 1, 3)
+        layout.addWidget(self.toolboxendline, 75 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # Authentication Box
         authentication_box = QHBoxLayout()
@@ -909,17 +946,17 @@ class MainWindow(QMainWindow):
         self.choose_file_button.setToolTip("Choose a file to use for the authentication credentials. Credentials should be saved like:\nUSERNAME1:PASSWORD1\nUSERNAME2:PASSWORD2")
         self.choose_file_button.clicked.connect(self.on_choose_file_button_clicked)
         authentication_box.addWidget(self.choose_file_button)
-        layout.addLayout(authentication_box, 80 + len(gpu_stats), 0, 1, 3)
+        layout.addLayout(authentication_box, 80 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # Extensions Selection Menu
         self.use_extensions_checkbox = QCheckBox("Use Extensions")
         self.use_extensions_checkbox.setToolTip("Choose the extensions to be loaded.")
-        layout.addWidget(self.use_extensions_checkbox, 90 + len(gpu_stats), 0)
+        layout.addWidget(self.use_extensions_checkbox, 90 + (len(gpu_stats) * 2), 0)
         self.use_extensions_checkbox.stateChanged.connect(self.on_use_extensions_checkbox_changed)
 
         self.extensions_list = QListWidget()
         self.extensions_list.setToolTip("Choose the extensions to be loaded.")
-        layout.addWidget(self.extensions_list, 90 + len(gpu_stats), 1, 1, 2)
+        layout.addWidget(self.extensions_list, 90 + (len(gpu_stats) * 2), 1, 1, 2)
         self.extensions_list.setFixedHeight(150)
         self.extensions_list.setVisible(False)
         extensions = [name for name in os.listdir(extensions_folder) if os.path.isdir(os.path.join(extensions_folder, name)) and "api" not in name.lower()]
@@ -934,12 +971,12 @@ class MainWindow(QMainWindow):
         # Lora selection menu
         self.use_lora_checkbox = QCheckBox("Use Loras")
         self.use_lora_checkbox.setToolTip("Choose the loras to be loaded.")
-        layout.addWidget(self.use_lora_checkbox, 100 + len(gpu_stats), 0)
+        layout.addWidget(self.use_lora_checkbox, 100 + (len(gpu_stats) * 2), 0)
         self.use_lora_checkbox.stateChanged.connect(self.on_use_lora_checkbox_changed)
 
         self.lora_list = QListWidget()
         self.lora_list.setToolTip("Choose the loras to be loaded.")
-        layout.addWidget(self.lora_list, 100 + len(gpu_stats), 1, 1, 2)
+        layout.addWidget(self.lora_list, 100 + (len(gpu_stats) * 2), 1, 1, 2)
         self.lora_list.setVisible(False)
         
         loras = [name for name in os.listdir(loras_folder) if os.path.isdir(os.path.join(loras_folder, name))]
@@ -952,71 +989,70 @@ class MainWindow(QMainWindow):
         # Use Whole Local Network
         self.use_network_checkbox = QCheckBox("Local Network Mode")
         self.use_network_checkbox.setToolTip("By default, the WebUI will only be reachable by the PC running it.\nIf you want to use it also on other devices, check this")
-        layout.addWidget(self.use_network_checkbox, 110 + len(gpu_stats), 0)
+        layout.addWidget(self.use_network_checkbox, 110 + (len(gpu_stats) * 2), 0)
 
         # Use Automatically opens the Browser when finished loading the webui
         self.use_autolaunch_checkbox = QCheckBox("Auto open Browser")
         self.use_autolaunch_checkbox.setToolTip("Automatically Opens your browser when loading is finished")
-        layout.addWidget(self.use_autolaunch_checkbox, 120 + len(gpu_stats), 0)
+        layout.addWidget(self.use_autolaunch_checkbox, 120 + (len(gpu_stats) * 2), 0)
     
         # Listen Port Checkbox and Text Field
         self.listen_port_checkbox = QCheckBox("Listen Port")
         self.listen_port_checkbox.setToolTip("Choose the Port to use for the WebUI.\nDefault is 7680. If you want to use Stable Diffusion at the same time,\nor got other services running on this Port, you can change it in the textfield.")
         self.listen_port_checkbox.stateChanged.connect(self.on_listen_port_checkbox_changed)
-        layout.addWidget(self.listen_port_checkbox, 130 + len(gpu_stats), 1)
+        layout.addWidget(self.listen_port_checkbox, 130 + (len(gpu_stats) * 2), 1)
     
         # Auto Close the GUI when pressing start.
         self.use_autoclose_checkbox = QCheckBox("Close GUI on Start")
         self.use_autoclose_checkbox.setToolTip("Auto Close the GUI when pressing start button.")
-        layout.addWidget(self.use_autoclose_checkbox, 130 + len(gpu_stats), 0)
+        layout.addWidget(self.use_autoclose_checkbox, 130 + (len(gpu_stats) * 2), 0)
 
         self.listen_port_textfield = QLineEdit()
         self.listen_port_textfield.setPlaceholderText("Enter port number")
         self.listen_port_textfield.setEnabled(False)
-        layout.addWidget(self.listen_port_textfield, 140 + len(gpu_stats), 1)
+        layout.addWidget(self.listen_port_textfield, 140 + (len(gpu_stats) * 2), 1)
 
         self.start_button = QPushButton("Start")
         self.start_button.setToolTip("Starts the Webui with the settings set by this GUI")
         self.start_button.clicked.connect(self.on_start_button_clicked)
-        layout.addWidget(self.start_button, 140 + len(gpu_stats), 0)
+        layout.addWidget(self.start_button, 140 + (len(gpu_stats) * 2), 0)
 
         self.save_button = QPushButton("Save Settings")
         self.save_button.setToolTip("You can Save your current Settings. Neat, isn't it?")
         self.save_button.clicked.connect(self.on_save_button_clicked)
-        layout.addWidget(self.save_button, 150 + len(gpu_stats), 0)
+        layout.addWidget(self.save_button, 150 + (len(gpu_stats) * 2), 0)
 
         # Load Button
         self.load_button = QPushButton("Load")
         self.load_button.setToolTip("It's a button. That loads a selected Profile. Sometimes, I'm just create explaining things.")
         self.load_button.clicked.connect(self.on_load_button_clicked)
-        layout.addWidget(self.load_button, 150 + len(gpu_stats), 1)
+        layout.addWidget(self.load_button, 150 + (len(gpu_stats) * 2), 1)
 
         # Show if Update is available
         self.update_button_ui = QPushButton("Update\nAvailable")
         self.update_button_ui.setToolTip("Shows if an update is available")
         self.update_button_ui.setStyleSheet("QPushButton { color: #ff9999; font-weight: bold; }")
         self.update_button_ui.clicked.connect(self.on_update_button_ui_clicked)
-        layout.addWidget(self.update_button_ui, 150 + len(gpu_stats), 2, 2, 2)
+        layout.addWidget(self.update_button_ui, 150 + (len(gpu_stats) * 2), 2, 2, 2)
         self.update_button_ui.setVisible(False)
 
         # Textfield for the Profile Name
         self.profile_name_textfield = QLineEdit()
         self.profile_name_textfield.setPlaceholderText("Enter Name for the Profile, keep empty to overwrite default")
         self.profile_name_textfield.setToolTip("You can leave this blank, then only the default profile will be overwritten. If you want to get some organizing done, you can name it. For example:\nProfile for RP\nProfile for Chat\nProfile for coding\nProfile for Superbooga\nERROR: 404 no limits found")
-        layout.addWidget(self.profile_name_textfield, 151 + len(gpu_stats), 0)
+        layout.addWidget(self.profile_name_textfield, 151 + (len(gpu_stats) * 2), 0)
 
         # Profiles Dropdown
         self.profiles_dropdown = QComboBox()
         self.populate_profiles_dropdown()
         #self.profiles_dropdown.setPlaceholderText("Choose Profile to load")
         self.profiles_dropdown.setToolTip("Here you can choose which profile you want to load. Choose, Load, Profit.")
-        #layout.addWidget(QLabel("Choose Profile:"), 84 + len(gpu_stats), 1)
-        layout.addWidget(self.profiles_dropdown, 151 + len(gpu_stats), 1)
+        #layout.addWidget(QLabel("Choose Profile:"), 84 + (len(gpu_stats) * 2), 1)
+        layout.addWidget(self.profiles_dropdown, 151 + (len(gpu_stats) * 2), 1)
     
         central_widget = QWidget()
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
-
 
     def on_api_public_checkbox_changed(self, state):
         self.api_streaming_port_SpinBox.setEnabled(False)
@@ -1088,12 +1124,6 @@ class MainWindow(QMainWindow):
             self.deepspeed_nvme_current_label.setText(f"Current Directory Folder: {self.selected_offload_directory}")
         else:
             self.selected_offload_directory = none
-
-#    def on_deepspeed_nvme_button_clicked(self):
- #       folder = QFileDialog.getExistingDirectory(self, "Offload Directory")
-   #     if folder:
-  #          self.offload_directory = folder
-    #        self.deepspeed_nvme_current_label.setText(f"Current Directory Folder: {self.offload_directory}")
 
     def on_deepspeed_nvme_checkbox_changed(self, state):
         self.deepspeed_nvme_label.setVisible(state == Qt.Checked)
@@ -1207,7 +1237,6 @@ class MainWindow(QMainWindow):
     def on_use_lora_checkbox_changed(self, state):
         self.lora_list.setVisible(state == Qt.Checked)
 
-    
     def on_use_disk_checkbox_changed(self, state):
         self.change_disk_cache_checkbox.setVisible(state == Qt.Checked)
         self.current_disk_cache_label.setVisible(state == Qt.Checked)
@@ -1254,6 +1283,24 @@ class MainWindow(QMainWindow):
 
     def on_ram_slider_changed(self, value):
         self.ram_value_label.setText(f"{value} GiB")
+
+    def on_pre_layer_slider_changed(self, value, idx):
+        if nvidia_gpu:
+            # Calculate the current total value of all sliders
+            total_value = sum(slider.value() for slider in self.pre_layer_slider)
+    
+            # Check if the total value exceeds the maximum
+            if total_value > self.pre_layer_amount_max:
+                # Calculate the maximum allowed value for the current slider
+                max_allowed_value = self.pre_layer_amount_max - (total_value - value)
+    
+                # Adjust the value of the current slider if necessary
+                if value > max_allowed_value:
+                    self.pre_layer_slider[idx].setValue(max_allowed_value)
+                    value = max_allowed_value
+        else:
+            # Update the value label with the current value of the pre-layer slider
+            self.pre_layer_value_label.setText(str(value))
 
     def on_pre_layer_slider_changed(self, value):
         # Update the value label with the current value of the pre-layer slider
@@ -1349,7 +1396,6 @@ class MainWindow(QMainWindow):
             "use_cpu": self.cpu_radio_button.isChecked(),  # Save the state of the CPU radio button
             "use_auto": self.auto_radio_button.isChecked(),  # Save the state of the auto device radio button
             "built_in_ram": self.ram_slider.value(),  # Save the value of the built-in RAM slider
-            "prelayer": self.pre_layer_value_label.text(), # Saves the Prelayer value
             "use_8bit": self.use_8bit_checkbox.isChecked(), # Saves the state of the 8bit checkbox
             "no_stream": self.use_nostream_checkbox.isChecked(), # Saves the state of the no_stream checkbox
             "use_16bit": self.use_16bit_checkbox.isChecked(), # Saves the state of the use_16bit checkbox
@@ -1418,6 +1464,10 @@ class MainWindow(QMainWindow):
 
         if nvidia_gpu:
             settings["gpu_vram"] = [slider.value() for slider in self.gpu_vram_sliders]
+            pre_layer_values = [slider.value() for slider in self.pre_layer_slider]
+            settings["prelayer"] = pre_layer_values
+        else:
+            settings["prelayer"] = self.pre_layer_value_label.text()
 
         # Get the text entered in the text field
         profile_name = self.profile_name_textfield.text()
@@ -1604,9 +1654,14 @@ class MainWindow(QMainWindow):
             if self.choose_file_label.text():
                 command += f" --gradio-auth-path {self.choose_file_label.text()}"
 
-        # Adds the Prelayer selection
-        if int(self.pre_layer_value_label.text()) > 0:
-            command += f" --pre_layer {self.pre_layer_value_label.text()}"
+        ## Adds the Prelayer selection
+        if nvidia_gpu:
+            slider_values = [slider.value() for slider in self.pre_layer_slider]
+            if any(value > 0 for value in slider_values):
+                command += f" --pre_layer {' '.join(str(value) for value in slider_values if value > 0)}"
+        else:
+            if int(self.pre_layer_value_label.text()) > 0:
+                command += f" --pre_layer {self.pre_layer_value_label.text()}"
 
         # IF sdp_attention is checked
         if self.use_sdp_attention_checkbox.isChecked():
@@ -1760,10 +1815,17 @@ class MainWindow(QMainWindow):
         self.authentication_checkbox.setChecked(settings.get("authentication", False))
         self.choose_file_label.setText(settings.get("authentication_file", ""))
         self.character_to_load.setCurrentText(settings.get("character", ""))
-        self.pre_layer_slider.setValue(int(settings.get("prelayer", 0)))
         self.use_autolaunch_checkbox.setChecked(settings.get("autolaunch", False))
         self.use_network_checkbox.setChecked(settings.get("listen", False))
-        
+
+        if nvidia_gpu:
+            if "prelayer" in settings:
+                pre_layer_values = settings["prelayer"]
+                for i, value in enumerate(pre_layer_values):
+                    self.pre_layer_slider[i].setValue(value)
+        else:
+            self.pre_layer_slider.setValue(int(settings.get("prelayer", 0)))
+
         if nvidia_gpu:
             gpu_vram_settings = settings.get("gpu_vram", [])
             for idx, slider in enumerate(self.gpu_vram_sliders):
