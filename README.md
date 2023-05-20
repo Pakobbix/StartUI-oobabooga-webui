@@ -12,7 +12,7 @@ WebUI StartGUI is a Python graphical user interface (GUI) written with PyQT5, th
 - Select the operating mode (chat, cai-chat, notebook)
 - Choose between CPU, GPU or Autodevice
 - Set CPU RAM/GPU VRAM (Only for Nvidia Right now, will automatically detect if multiple GPU's are Present)
-- Adjust pre-layer value
+- Adjust pre-layer value (for each Nvidia GPU found or 1 if none)
 - Choose to run with 8bit, 16bit, trust_remote_code, Quant_attn, Autotune and no-cache flags
 - Enable authentication and choose an authentication file
 - Choose extensions for the WebUI
