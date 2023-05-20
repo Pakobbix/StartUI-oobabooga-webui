@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QApplication, QHBoxLayout, QToolBar, QMessageBox, QA
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
 
-version = "1.4"
+version = "1.5b"
 
 profiles_folder = "./profiles"
 os.makedirs(profiles_folder, exist_ok=True)
@@ -467,11 +467,21 @@ class MainWindow(QMainWindow):
         self.use_multimodal_checkbox.setToolTip("Use multimodal models.")
         layout.addWidget(self.use_multimodal_checkbox, 20 + len(gpu_stats), 1)
 
+        # Add autogptq checkbox
+        self.use_autogptq_checkbox = QCheckBox("AutoGPTQ")
+        self.use_autogptq_checkbox.setToolTip("Use AutoGPTQ for loading quantized models instead of the internal GPTQ loader.")
+        layout.addWidget(self.use_autogptq_checkbox, 21 + len(gpu_stats), 0)
+
+        # Add Triton checkbox
+        self.use_triton_checkbox = QCheckBox("Triton")
+        self.use_triton_checkbox.setToolTip("Use Triton for inference.")
+        layout.addWidget(self.use_triton_checkbox, 21 + len(gpu_stats), 1)
+
         # Add horizontal line to seperate the Checkboxes
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(line, 21 + len(gpu_stats), 0, 1, 3)
+        layout.addWidget(line, 22 + len(gpu_stats), 0, 1, 3)
 
         # New GUI Options based on Toolbox Checkboxes.
 
@@ -1351,6 +1361,8 @@ class MainWindow(QMainWindow):
             "quant_attn": self.use_quant_checkbox.isChecked(), # Saves the state of the quant_attn checkbox
             "multimodal": self.use_multimodal_checkbox.isChecked(), # Saves the state of the multimodal checkbox
             "sdp_attention": self.use_sdp_attention_checkbox.isChecked(), # Saves the state of the sdp_attention checkbox
+            "autogptq": self.use_autogptq_checkbox.isChecked(), # Saves the state of the autogptq checkbox
+            "triton": self.use_triton_checkbox.isChecked(), # Saves the state of the triton checkbox
             "deepspeed": self.deepspeed_settings_checkbox.isChecked(), # Saves the state of the deepspeed checkbox
             "deepspeed_enabled": self.deepspeed_checkbox.isChecked(), # Saves the state of the deepspeed checkbox
             "deepspeed_gpu_num": self.deepspeed_gpu_num_spinbox.value(), # Saves the state of the deepspeed_gpu_num_spinbox
@@ -1600,6 +1612,14 @@ class MainWindow(QMainWindow):
         if self.use_sdp_attention_checkbox.isChecked():
             command += " --sdp-attention"
 
+        # If AutoGPTQ is checked
+        if self.use_autogptq_checkbox.isChecked():
+            command += " --autogptq"
+
+        # If triton is checked
+        if self.use_triton_checkbox.isChecked():
+            command += " --triton"
+
         # Adds the chosen extensions to the list of the command.
         extensions = [self.extensions_list.item(i).text() for i in range(self.extensions_list.count()) if self.extensions_list.item(i).checkState() == Qt.Checked]
         if self.use_extensions_checkbox.isChecked():
@@ -1693,6 +1713,8 @@ class MainWindow(QMainWindow):
         self.use_quant_checkbox.setChecked(settings.get("quant_attn", False))
         self.use_multimodal_checkbox.setChecked(settings.get("multimodal", False))
         self.use_sdp_attention_checkbox.setChecked(settings.get("sdp_attention", False))
+        self.use_autogptq_checkbox.setChecked(settings.get("autogptq", False))
+        self.use_triton_checkbox.setChecked(settings.get("triton", False))
         self.deepspeed_settings_checkbox.setChecked(settings.get("deepspeed", False))
         self.deepspeed_checkbox.setChecked(settings.get("deepspeed_enabled", False))
         self.deepspeed_gpu_num_spinbox.setValue(int(settings.get("deepspeed_gpu_num", 0)))
