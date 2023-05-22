@@ -372,42 +372,27 @@ class MainWindow(QMainWindow):
         # Connect the valueChanged signal of the RAM slider to update the value label
         self.ram_slider.valueChanged.connect(self.on_ram_slider_changed)
 
-        # Pre-layer Slider 
-        # Check if Nvidia_gpu is enabled, if not, we don't need multiple pre_layer slider.
-        if nvidia_gpu:
-            self.pre_layer_labels = []
-            self.pre_layer_slider = []
-            self.pre_layer_slider_value = []
-            self.pre_layer_amount_max = 100
-            # Don't get confused. With the latest changes, each GPU can have it's own pre_layer value. So we check again gpu_stats for the amount.
-            for i, gpu in enumerate(gpu_stats):
-                pre_layer_labels = QLabel(f"{gpu.name} Pre_Layer:")
-                pre_layer_labels.setToolTip(f"The number of layers to allocate to the GPU.\nSetting this parameter enables CPU offloading for 4-bit models.\nFor multi-gpu, write the numbers separated by spaces, eg --pre_layer 30 60.")
-                layout.addWidget(pre_layer_labels, 11 + (len(gpu_stats) * 2) + i, 0)
-                self.pre_layer_labels.append(pre_layer_labels)
+        # Pre-layer Slider
+        self.pre_layer_labels = []
+        self.pre_layer_slider = []
+        self.pre_layer_slider_value = []
+        self.pre_layer_amount_max = 100
+        # Don't get confused. With the latest changes, each GPU can have it's own pre_layer value. So we check again gpu_stats for the amount.
+        for i, gpu in enumerate(gpu_stats):
+            pre_layer_labels = QLabel(f"{gpu.name} Pre_Layer:")
+            pre_layer_labels.setToolTip(f"The number of layers to allocate to the GPU.\nSetting this parameter enables CPU offloading for 4-bit models.\nFor multi-gpu, write the numbers separated by spaces, eg --pre_layer 30 60.")
+            layout.addWidget(pre_layer_labels, 11 + (len(gpu_stats) * 2) + i, 0)
+            self.pre_layer_labels.append(pre_layer_labels)
 
-                pre_layer_sliders = QSlider(Qt.Horizontal)
-                pre_layer_sliders.setMaximum(100)
-                pre_layer_sliders.valueChanged.connect(lambda value, idx=i: self.on_pre_layer_slider_changed(value, idx))
-                layout.addWidget(pre_layer_sliders, 11 + (len(gpu_stats) * 2) + i, 1)
-                self.pre_layer_slider.append(pre_layer_sliders)
+            pre_layer_sliders = QSlider(Qt.Horizontal)
+            pre_layer_sliders.setMaximum(100)
+            pre_layer_sliders.valueChanged.connect(lambda value, idx=i: self.on_pre_layer_slider_changed(value, idx))
+            layout.addWidget(pre_layer_sliders, 11 + (len(gpu_stats) * 2) + i, 1)
+            self.pre_layer_slider.append(pre_layer_sliders)
 
-                pre_layer_sliders_value = QLabel("0")
-                layout.addWidget(pre_layer_sliders_value, 11 + (len(gpu_stats) * 2) + i, 2)
-                self.pre_layer_slider_value.append(pre_layer_sliders_value)
-        else:
-            self.pre_layer_slider = QSlider(Qt.Horizontal)
-            self.pre_layer_slider.setMinimum(0)
-            self.pre_layer_slider.setMaximum(100)
-            self.pre_layer_slider.setTickInterval(1)
-            self.pre_layer_slider.setSingleStep(1)
-            layout.addWidget(QLabel("Pre-layer:"), 11 + len(gpu_stats), 0)
-            self.pre_layer_slider.setToolTip("The number of layers to allocate to the GPU. Setting this parameter enables CPU offloading for 4-bit models.")
-            layout.addWidget(self.pre_layer_slider, 11 + len(gpu_stats), 1)
-            self.pre_layer_slider.valueChanged.connect(self.on_pre_layer_slider_changed)
-
-            self.pre_layer_value_label = QLabel("0")
-            layout.addWidget(self.pre_layer_value_label, 11 + len(gpu_stats), 2)
+            pre_layer_sliders_value = QLabel("0")
+            layout.addWidget(pre_layer_sliders_value, 11 + (len(gpu_stats) * 2) + i, 2)
+            self.pre_layer_slider_value.append(pre_layer_sliders_value)
 
         # Add horizontal line to seperate the Checkboxes
         line = QFrame()
@@ -1285,26 +1270,20 @@ class MainWindow(QMainWindow):
         self.ram_value_label.setText(f"{value} GiB")
 
     def on_pre_layer_slider_changed(self, value, idx):
-        if nvidia_gpu:
-            # Calculate the current total value of all sliders
-            total_value = sum(slider.value() for slider in self.pre_layer_slider)
+        # Calculate the current total value of all sliders
+        total_value = sum(slider.value() for slider in self.pre_layer_slider)
     
-            # Check if the total value exceeds the maximum
-            if total_value > self.pre_layer_amount_max:
-                # Calculate the maximum allowed value for the current slider
-                max_allowed_value = self.pre_layer_amount_max - (total_value - value)
+        # Check if the total value exceeds the maximum
+        if total_value > self.pre_layer_amount_max:
+            # Calculate the maximum allowed value for the current slider
+            max_allowed_value = self.pre_layer_amount_max - (total_value - value)
     
-                # Adjust the value of the current slider if necessary
-                if value > max_allowed_value:
-                    self.pre_layer_slider[idx].setValue(max_allowed_value)
-                    value = max_allowed_value
-        else:
-            # Update the value label with the current value of the pre-layer slider
-            self.pre_layer_value_label.setText(str(value))
-
-    def on_pre_layer_slider_changed(self, value):
-        # Update the value label with the current value of the pre-layer slider
-        self.pre_layer_value_label.setText(str(value))
+            # Adjust the value of the current slider if necessary
+            if value > max_allowed_value:
+                self.pre_layer_slider[idx].setValue(max_allowed_value)
+                value = max_allowed_value
+    
+        self.pre_layer_slider_value[idx].setText(str(value))
 
     def on_vram_slider_changed(self, value, gpu_idx):
         self.gpu_vram_labels[gpu_idx].setText(f"{value} GiB")
@@ -1396,6 +1375,7 @@ class MainWindow(QMainWindow):
             "use_cpu": self.cpu_radio_button.isChecked(),  # Save the state of the CPU radio button
             "use_auto": self.auto_radio_button.isChecked(),  # Save the state of the auto device radio button
             "built_in_ram": self.ram_slider.value(),  # Save the value of the built-in RAM slider
+            #"prelayer": self.pre_layer_value_label.text(), # Saves the Prelayer value
             "use_8bit": self.use_8bit_checkbox.isChecked(), # Saves the state of the 8bit checkbox
             "no_stream": self.use_nostream_checkbox.isChecked(), # Saves the state of the no_stream checkbox
             "use_16bit": self.use_16bit_checkbox.isChecked(), # Saves the state of the use_16bit checkbox
@@ -1462,12 +1442,11 @@ class MainWindow(QMainWindow):
             "loras": [self.lora_list.item(i).text() for i in range(self.lora_list.count()) if self.lora_list.item(i).checkState() == Qt.Checked] # Saves the chosen loras
         }
 
+        pre_layer_values = [slider.value() for slider in self.pre_layer_slider]
+        settings["prelayer"] = pre_layer_values
+
         if nvidia_gpu:
             settings["gpu_vram"] = [slider.value() for slider in self.gpu_vram_sliders]
-            pre_layer_values = [slider.value() for slider in self.pre_layer_slider]
-            settings["prelayer"] = pre_layer_values
-        else:
-            settings["prelayer"] = self.pre_layer_value_label.text()
 
         # Get the text entered in the text field
         profile_name = self.profile_name_textfield.text()
@@ -1655,13 +1634,9 @@ class MainWindow(QMainWindow):
                 command += f" --gradio-auth-path {self.choose_file_label.text()}"
 
         ## Adds the Prelayer selection
-        if nvidia_gpu:
-            slider_values = [slider.value() for slider in self.pre_layer_slider]
-            if any(value > 0 for value in slider_values):
-                command += f" --pre_layer {' '.join(str(value) for value in slider_values if value > 0)}"
-        else:
-            if int(self.pre_layer_value_label.text()) > 0:
-                command += f" --pre_layer {self.pre_layer_value_label.text()}"
+        slider_values = [slider.value() for slider in self.pre_layer_slider]
+        if any(value > 0 for value in slider_values):
+            command += f" --pre_layer {' '.join(str(value) for value in slider_values if value > 0)}"
 
         # IF sdp_attention is checked
         if self.use_sdp_attention_checkbox.isChecked():
@@ -1815,16 +1790,14 @@ class MainWindow(QMainWindow):
         self.authentication_checkbox.setChecked(settings.get("authentication", False))
         self.choose_file_label.setText(settings.get("authentication_file", ""))
         self.character_to_load.setCurrentText(settings.get("character", ""))
+        #self.pre_layer_slider.setValue(int(settings.get("prelayer", 0)))
         self.use_autolaunch_checkbox.setChecked(settings.get("autolaunch", False))
         self.use_network_checkbox.setChecked(settings.get("listen", False))
 
-        if nvidia_gpu:
-            if "prelayer" in settings:
-                pre_layer_values = settings["prelayer"]
-                for i, value in enumerate(pre_layer_values):
-                    self.pre_layer_slider[i].setValue(value)
-        else:
-            self.pre_layer_slider.setValue(int(settings.get("prelayer", 0)))
+        if "prelayer" in settings:
+            pre_layer_values = settings["prelayer"]
+            for i, value in enumerate(pre_layer_values):
+                self.pre_layer_slider[i].setValue(value)
 
         if nvidia_gpu:
             gpu_vram_settings = settings.get("gpu_vram", [])
