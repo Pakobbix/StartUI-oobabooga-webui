@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
 
 # For showing the current version and checking for updates
-version = "1.5"
+version = "1.5.1"
 
 # Profile folder for loading and saving profiles.
 profiles_folder = "./profiles"
