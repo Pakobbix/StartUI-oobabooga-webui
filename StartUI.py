@@ -16,6 +16,11 @@ extensions_folder = "./text-generation-webui/extensions"
 loras_folder = "./text-generation-webui/loras"
 characters_folder = "./text-generation-webui/characters"
 
+if getattr(sys, 'frozen', False):
+    webui_file = sys._MEIPASS + '/webuiGUI.py'
+else:
+    webui_file = 'webuiGUI.py'
+
 # Get the current Max CPU threads to use, so the user can't exceed his thread count.
 max_threads = psutil.cpu_count(logical=True)
 
@@ -154,7 +159,7 @@ class MainWindow(QMainWindow):
         self.Accelerate_settings_checkbox.stateChanged.connect(self.on_Accelerate_settings_checkbox_stateChanged)
         toolbar.addWidget(self.Accelerate_settings_checkbox)
         if platform.system() == 'Windows':
-            #self.Accelerate_settings_checkbox.setEnabled(False)
+            self.Accelerate_settings_checkbox.setEnabled(False)
             self.Accelerate_settings_checkbox.setToolTip("Accelerate is not Supported in Windows.")
 
         ################################################
@@ -1652,9 +1657,8 @@ class MainWindow(QMainWindow):
             command += f" --model {chosen_model}"
 
         # Add the chosen model type to the command
-        chosen_model_type = self.model_type.currentText()
         if self.model_type.currentText() != "none" and self.model_dropdown.currentText() != "none":
-            command += f" --model_type {chosen_model_type}"
+            command += f" --model_type {self.model_type.currentText()}"
 
         # Add loras to the command
         loras = [self.lora_list.item(i).text() for i in range(self.lora_list.count()) if self.lora_list.item(i).checkState() == Qt.Checked]
@@ -1663,22 +1667,18 @@ class MainWindow(QMainWindow):
                 command += f" --lora {' '.join(loras)}"
 
         # Add Characters to the command
-        chosen_characters = self.character_to_load.currentText()
         if self.character_to_load.currentText() != "none":
-            command += f" --character {chosen_characters}"
-            print(chosen_characters)
+            command += f" --character {self.character_to_load.currentText()}"
 
         # Adds wbits to the command, if not "none"
-        chosen_wbits = self.wbit_dropdown.currentText()
         if self.wbit_dropdown.currentText() != "none":
             if not self.cpu_radio_button.isChecked() and self.model_dropdown.currentText() != "none":
-                command += f" --wbits {chosen_wbits}"
+                command += f" --wbits {self.wbit_dropdown.currentText()}"
 
         # Adds Groupsize to the command, if not "none"
-        chosen_gsize = self.gsize_dropdown.currentText()
         if self.gsize_dropdown.currentText() != "none":
             if not self.cpu_radio_button.isChecked() and self.model_dropdown.currentText() != "none":
-                command += f" --groupsize {chosen_gsize}"
+                command += f" --groupsize {self.gsize_dropdown.currentText()}"
 
         # Add the chosen mode to the command (Chat, cai-chat, notebook)
         chosen_mode = self.mode_dropdown.currentText()
@@ -1753,10 +1753,10 @@ class MainWindow(QMainWindow):
         if self.accelerate4bit_checkbox.isChecked():
             command += " --load-in-4bit"
 
-        if self.accelerate4bit_compute_type_dropdown != "none":
+        if self.accelerate4bit_compute_type_dropdown.currentText() != "none":
             command += f" --compute_dtype {self.accelerate4bit_compute_type_dropdown.currentText()}"
 
-        if self.accelerate4bit_quant_type_dropdown != "none":
+        if self.accelerate4bit_quant_type_dropdown.currentText() != "none":
             command += f" --quant_type {self.accelerate4bit_quant_type_dropdown.currentText()}"
 
         if self.accelerate4bit_double_quant_checkbox.isChecked():
@@ -1808,7 +1808,6 @@ class MainWindow(QMainWindow):
         # If AutoGPTQ is checked
         if self.use_autogptq_checkbox.isChecked():
             command += " --autogptq"
-            run_cmd_with_conda("pip install auto_gptq && exit")
 
         # If triton is checked
         if self.use_triton_checkbox.isChecked():
@@ -1831,7 +1830,7 @@ class MainWindow(QMainWindow):
                 command += f" --api-streaming-port {self.api_streaming_port_SpinBox.text()}"
 
         # Just for debugging.
-        print(f"Command generated: python webuiGUI.py {command}")
+        print(f"Command generated: python {webui_file} {command}")
 
         # Based on the Model that's chosen, we will take care of some necessary stuff.
         # Starts the webui in the conda env with the user given Options
@@ -1851,15 +1850,15 @@ class MainWindow(QMainWindow):
 
         if not self.deepspeed_checkbox.isChecked():
             if self.use_8bit_checkbox.isChecked():
-                run_cmd_with_conda(f"pip install accelerate && python webuiGUI.py {command}")
+                run_cmd_with_conda(f"pip install accelerate && python {webui_file} {command}")
             else:
-                run_cmd_with_conda(f"python webuiGUI.py {command}")
+                run_cmd_with_conda(f"python {webui_file} {command}")
 
         if self.use_autoclose_checkbox.isChecked():
             sys.exit()
             
     def on_update_button_clicked(self):
-        run_cmd_with_conda("python webuiGUI.py --update && exit")
+        run_cmd_with_conda(f"python {webui_file} --update && exit")
 
     def load_profile(self, profile_file):
         with open(profile_file, "r") as file:
