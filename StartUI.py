@@ -1520,7 +1520,6 @@ class MainWindow(QMainWindow):
             "use_cpu": self.cpu_radio_button.isChecked(),  # Save the state of the CPU radio button
             "use_auto": self.auto_radio_button.isChecked(),  # Save the state of the auto device radio button
             "built_in_ram": self.ram_slider.value(),  # Save the value of the built-in RAM slider
-            #"prelayer": self.pre_layer_value_label.text(), # Saves the Prelayer value
             "use_8bit": self.use_8bit_checkbox.isChecked(), # Saves the state of the 8bit checkbox
             "no_stream": self.use_nostream_checkbox.isChecked(), # Saves the state of the no_stream checkbox
             "use_16bit": self.use_16bit_checkbox.isChecked(), # Saves the state of the use_16bit checkbox
@@ -1534,6 +1533,11 @@ class MainWindow(QMainWindow):
             "sdp_attention": self.use_sdp_attention_checkbox.isChecked(), # Saves the state of the sdp_attention checkbox
             "autogptq": self.use_autogptq_checkbox.isChecked(), # Saves the state of the autogptq checkbox
             "triton": self.use_triton_checkbox.isChecked(), # Saves the state of the triton checkbox
+            "acceleration": self.Accelerate_settings_checkbox.isChecked(), # Saves the state of the Accelerate checkbox
+            "use_4bit": self.accelerate4bit_checkbox.isChecked(), # Saves the state of the accelerate4bit checkbox
+            "compute_dtype": self.accelerate4bit_compute_type_dropdown.currentText(), # Saves the state of the accelerate4bit_compute_type_dropdown
+            "quant_type": self.accelerate4bit_quant_type_dropdown.currentText(), # Saves the state of the accelerate4bit_quant_type_dropdown
+            "use_x2_quant": self.accelerate4bit_double_quant_checkbox.isChecked(), # Saves the state of the accelerate4bit_double_quant_checkbox
             "deepspeed": self.deepspeed_settings_checkbox.isChecked(), # Saves the state of the deepspeed checkbox
             "deepspeed_enabled": self.deepspeed_checkbox.isChecked(), # Saves the state of the deepspeed checkbox
             "deepspeed_gpu_num": self.deepspeed_gpu_num_spinbox.value(), # Saves the state of the deepspeed_gpu_num_spinbox
@@ -1603,7 +1607,6 @@ class MainWindow(QMainWindow):
 
     def expression_check(self, command):
         selected_model = self.model_dropdown.currentText()
-        #print(f"Selected model: {selected_model}")
         
         # Use a regular expression to check if the selected model matches the pattern
         if re.search(r".*mpt.*7b", selected_model, re.IGNORECASE):
@@ -1909,6 +1912,11 @@ class MainWindow(QMainWindow):
         self.use_sdp_attention_checkbox.setChecked(settings.get("sdp_attention", False))
         self.use_autogptq_checkbox.setChecked(settings.get("autogptq", False))
         self.use_triton_checkbox.setChecked(settings.get("triton", False))
+        self.Accelerate_settings_checkbox.setChecked(settings.get("acceleration", False))
+        self.accelerate4bit_checkbox.setChecked(settings.get("use_4bit", False))
+        self.accelerate4bit_compute_type_dropdown.setCurrentText(settings.get("compute_dtype", ""))
+        self.accelerate4bit_quant_type_dropdown.setCurrentText(settings.get("quant_type", ""))
+        self.accelerate4bit_double_quant_checkbox.setChecked(settings.get("use_x2_quant", False))
         self.deepspeed_settings_checkbox.setChecked(settings.get("deepspeed", False))
         self.deepspeed_checkbox.setChecked(settings.get("deepspeed_enabled", False))
         self.deepspeed_gpu_num_spinbox.setValue(int(settings.get("deepspeed_gpu_num", 0)))
