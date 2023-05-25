@@ -1,4 +1,4 @@
-import sys, os, gpustat, json, subprocess, platform, psutil, re, requests, darkdetect, qdarkstyle
+import sys, os, gpustat, json, subprocess, platform, psutil, re, requests, darkdetect, qdarkstyle, time
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QToolBar, QMessageBox, QAction, QMainWindow, QSpinBox, QLabel, QVBoxLayout, QComboBox, QSlider, QCheckBox, QLineEdit, QFileDialog, QPushButton, QWidget, QListWidget, QListWidgetItem, QGridLayout, QRadioButton, QFrame
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
@@ -15,6 +15,7 @@ model_folder = "./text-generation-webui/models"
 extensions_folder = "./text-generation-webui/extensions"
 loras_folder = "./text-generation-webui/loras"
 characters_folder = "./text-generation-webui/characters"
+
 # Get the current Max CPU threads to use, so the user can't exceed his thread count.
 max_threads = psutil.cpu_count(logical=True)
 
@@ -50,6 +51,7 @@ def run_cmd_with_conda(cmd, env=None):
 
         # Open a separate terminal window and execute the command
         subprocess.Popen(['start', 'cmd', '/k', full_cmd], shell=True, env=env)
+    
     elif platform.system() == 'Linux':
         # Define the necessary variables from the bash script
         install_dir = os.path.dirname(os.path.abspath(__file__))
@@ -90,7 +92,14 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         self.setWindowTitle(f'StartUI for oobabooga webui v{version}')
 
-        # ToolBar
+        ##########################################
+        #  _____           _   ____              #
+        # |_   _|__   ___ | | | __ )  __ _ _ __  #
+        #   | |/ _ \ / _ \| | |  _ \ / _` | '__| #
+        #   | | (_) | (_) | | | |_) | (_| | |    #
+        #   |_|\___/ \___/|_| |____/ \__,_|_|    #
+        #                                        #
+        ##########################################
         toolbar = QToolBar()
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
@@ -100,28 +109,31 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(toolbar_label)
 
         # Deepspeed checkbox
-        self.deepspeed_settings_checkbox = QCheckBox("   DeepSpeed   ")
+        self.deepspeed_settings_checkbox = QCheckBox("\tDeepSpeed\t")
+        self.deepspeed_settings_checkbox.setToolTip("Enables specific DeepSpeed Settings.")
         self.deepspeed_settings_checkbox.setChecked(False)
-        self.deepspeed_settings_checkbox.setToolTip("Enables Deepspeed Settings")
         self.deepspeed_settings_checkbox.stateChanged.connect(self.on_deepspeed_settings_checkbox_stateChanged)
         toolbar.addWidget(self.deepspeed_settings_checkbox)
+        if platform.system() == 'Windows':
+            self.deepspeed_settings_checkbox.setEnabled(False)
+            self.deepspeed_settings_checkbox.setToolTip("DeepSpeed is not Supported in Windows.")
 
         # llama.cpp checkbox
-        self.llama_settings_checkbox = QCheckBox("   llama.cpp   ")
+        self.llama_settings_checkbox = QCheckBox("\tllama.cpp\t")
         self.llama_settings_checkbox.setChecked(False)
         self.llama_settings_checkbox.setToolTip("Enables llama.cpp Settings")
         self.llama_settings_checkbox.stateChanged.connect(self.on_llama_settings_checkbox_stateChanged)
         toolbar.addWidget(self.llama_settings_checkbox)
 
         # FlexGen Checkbox
-        self.flexgen_settings_checkbox = QCheckBox("   FlexGen   ")
+        self.flexgen_settings_checkbox = QCheckBox("\tFlexGen\t")
         self.flexgen_settings_checkbox.setChecked(False)
         self.flexgen_settings_checkbox.setToolTip("Enables FlexGen Settings")
         self.flexgen_settings_checkbox.stateChanged.connect(self.on_flexgen_settings_checkbox_stateChanged)
         toolbar.addWidget(self.flexgen_settings_checkbox)
 
         # RWKV Checkbox
-        self.rwkv_settings_checkbox = QCheckBox("   RWKV   ")
+        self.rwkv_settings_checkbox = QCheckBox("\tRWKV\t")
         self.rwkv_settings_checkbox.setChecked(False)
         self.rwkv_settings_checkbox.setVisible(False)
         self.rwkv_settings_checkbox.setToolTip("Enables RWKV Settings")
@@ -129,13 +141,30 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self.rwkv_settings_checkbox)
 
         # API Checkbox
-        self.api_settings_checkbox = QCheckBox("   API   ")
+        self.api_settings_checkbox = QCheckBox("\tAPI\t")
         self.api_settings_checkbox.setChecked(False)
         self.api_settings_checkbox.setToolTip("Enables API Settings")
         self.api_settings_checkbox.stateChanged.connect(self.on_api_settings_checkbox_stateChanged)
         toolbar.addWidget(self.api_settings_checkbox)
 
-        # Menu Bar
+        # Accelerate Checkbox
+        self.Accelerate_settings_checkbox = QCheckBox("\tAccelerate\t")
+        self.Accelerate_settings_checkbox.setChecked(False)
+        self.Accelerate_settings_checkbox.setToolTip("Enables API Settings")
+        self.Accelerate_settings_checkbox.stateChanged.connect(self.on_Accelerate_settings_checkbox_stateChanged)
+        toolbar.addWidget(self.Accelerate_settings_checkbox)
+        if platform.system() == 'Windows':
+            #self.Accelerate_settings_checkbox.setEnabled(False)
+            self.Accelerate_settings_checkbox.setToolTip("Accelerate is not Supported in Windows.")
+
+        ################################################
+        #  __  __                    ____              #
+        # |  \/  | ___ _ __  _   _  | __ )  __ _ _ __  #
+        # | |\/| |/ _ \ '_ \| | | | |  _ \ / _` | '__| #
+        # | |  | |  __/ | | | |_| | | |_) | (_| | |    #
+        # |_|  |_|\___|_| |_|\__,_| |____/ \__,_|_|    #
+        #                                              #
+        ################################################
         menu = self.menuBar()
 
         # Main menu
@@ -179,7 +208,14 @@ class MainWindow(QMainWindow):
         report_bug_action.triggered.connect(self.on_report_bug_clicked)
         help_menu.addAction(report_bug_action)
 
-        # Main Window Layout, column width
+        ###################################################################
+        #  __  __       _        __        ___           _                #
+        # |  \/  | __ _(_)_ __   \ \      / (_)_ __   __| | _____      __ #
+        # | |\/| |/ _` | | '_ \   \ \ /\ / /| | '_ \ / _` |/ _ \ \ /\ / / #
+        # | |  | | (_| | | | | |   \ V  V / | | | | | (_| | (_) \ V  V /  #
+        # |_|  |_|\__,_|_|_| |_|    \_/\_/  |_|_| |_|\__,_|\___/ \_/\_/   #
+        #                                                                 #
+        ###################################################################
         layout = QGridLayout()
         layout.setColumnMinimumWidth(0, 350)
         layout.setColumnMinimumWidth(3, 30)
@@ -215,7 +251,6 @@ class MainWindow(QMainWindow):
         self.model_type.setToolTip("Select the Model Type")
         model_type_box.addWidget(self.model_type)
         layout.addLayout(model_type_box, 1, 0)
-
 
         # Character
         character_box = QHBoxLayout()
@@ -507,7 +542,14 @@ class MainWindow(QMainWindow):
 
         # New GUI Options based on Toolbox Checkboxes.
 
-        # Deepspeed
+        ######################################################
+        #  ____                 ____                      _  #
+        # |  _ \  ___  ___ _ __/ ___| _ __   ___  ___  __| | #
+        # | | | |/ _ \/ _ \ '_ \___ \| '_ \ / _ \/ _ \/ _` | #
+        # | |_| |  __/  __/ |_) |__) | |_) |  __/  __/ (_| | #
+        # |____/ \___|\___| .__/____/| .__/ \___|\___|\__,_| #
+        #                 |_|        |_|                     #
+        ######################################################
 
         # Deepspeed Header
         self.deepspeed_label_header = QLabel("Deepspeed Options:")
@@ -586,7 +628,14 @@ class MainWindow(QMainWindow):
         self.deepspeed_line.setVisible(False)
         layout.addWidget(self.deepspeed_line, 36 + (len(gpu_stats) * 2), 0, 1, 3)
 
-        # llama.cpp
+        #################################################
+        #  _ _                                          #
+        # | | | __ _ _ __ ___   __ _   ___ _ __  _ __   #
+        # | | |/ _` | '_ ` _ \ / _` | / __| '_ \| '_ \  #
+        # | | | (_| | | | | | | (_| || (__| |_) | |_) | #
+        # |_|_|\__,_|_| |_| |_|\__,_(_)___| .__/| .__/  #
+        #                                 |_|   |_|     #
+        #################################################
 
         # llama.cpp Header
         self.llama_label_header = QLabel("llama.cpp Options:")
@@ -695,7 +744,14 @@ class MainWindow(QMainWindow):
         self.llama_line.setVisible(False)
         layout.addWidget(self.llama_line, 46 + (len(gpu_stats) * 2), 0, 1, 3)
 
-        # FlexGen Options
+        ########################################
+        #  _____ _            ____             #
+        # |  ___| | _____  __/ ___| ___ _ __   #
+        # | |_  | |/ _ \ \/ / |  _ / _ \ '_ \  #
+        # |  _| | |  __/>  <| |_| |  __/ | | | #
+        # |_|   |_|\___/_/\_\\____|\___|_| |_| #
+        #                                      #
+        ########################################
 
         # FlexGen Header Label
         self.flexgen_header_label = QLabel("FlexGen Options")
@@ -795,7 +851,14 @@ class MainWindow(QMainWindow):
         self.flexline.setVisible(False)
         layout.addWidget(self.flexline, 54 + (len(gpu_stats) * 2), 0, 1, 3)
 
-        # RWKV Options
+        ###################################
+        #  ______        ___  ____     __ #
+        # |  _ \ \      / / |/ /\ \   / / #
+        # | |_) \ \ /\ / /| ' /  \ \ / /  #
+        # |  _ < \ V  V / | . \   \ V /   #
+        # |_| \_\ \_/\_/  |_|\_\   \_/    #
+        #                                 #
+        ###################################
 
         # RWKV Header
         self.rwkv_header = QLabel("RWKV:")
@@ -850,7 +913,14 @@ class MainWindow(QMainWindow):
         self.rwkv_line.setVisible(False)
         layout.addWidget(self.rwkv_line, 65 + (len(gpu_stats) * 2), 0, 1, 3)
 
-        # API Options
+        ######################
+        #     _    ____ ___  #
+        #    / \  |  _ \_ _| #
+        #   / _ \ | |_) | |  #
+        #  / ___ \|  __/| |  #
+        # /_/   \_\_|  |___| #
+        #                    #
+        ######################
 
         # API Header Label
         self.api_header = QLabel("API:")
@@ -863,7 +933,6 @@ class MainWindow(QMainWindow):
         self.api_checkbox.setToolTip("Enable the API extension.")
         self.api_checkbox.setVisible(False)
         layout.addWidget(self.api_checkbox, 71 + (len(gpu_stats) * 2), 0)
-        #self.api_checkbox.stateChanged.connect(self.on_api_checkbox_changed)
 
         # API blocking Port Checkbox
         self.api_blocking_port_checkbox = QCheckBox("Change API Blocking Port")
@@ -905,11 +974,79 @@ class MainWindow(QMainWindow):
         self.api_public_checkbox.stateChanged.connect(self.on_api_public_checkbox_changed)
 
         # Seperator for the Toolbox Options
+        self.toolboxapiline = QFrame()
+        self.toolboxapiline.setFrameShape(QFrame.HLine)
+        self.toolboxapiline.setFrameShadow(QFrame.Sunken)
+        self.toolboxapiline.setVisible(False)
+        layout.addWidget(self.toolboxapiline, 75 + (len(gpu_stats) * 2), 0, 1, 3)
+
+        #############################################################################
+        #     _                _                _         _  _         _     _ _    #
+        #    / \   ___ ___ ___| | ___ _ __ __ _| |_ ___  | || |       | |__ (_) |_  #
+        #   / _ \ / __/ __/ _ \ |/ _ \ '__/ _` | __/ _ \ | || |_ _____| '_ \| | __| #
+        #  / ___ \ (_| (_|  __/ |  __/ | | (_| | ||  __/ |__   _|_____| |_) | | |_  #
+        # /_/   \_\___\___\___|_|\___|_|  \__,_|\__\___|    |_|       |_.__/|_|\__| #
+        #                                                                           #
+        #############################################################################
+
+        # Accelerate 4-bit Header
+        self.accelerate4bit_header = QLabel("Accelerate 4-bit:")
+        self.accelerate4bit_header.setVisible(False)
+        self.accelerate4bit_header.setToolTip("Accelerate 4-bit: Choose the settings to use for accelerating 4-bit models.")
+        layout.addWidget(self.accelerate4bit_header, 80 + (len(gpu_stats) * 2), 0)
+
+        # Accelerate 4-bit Checkbox
+        self.accelerate4bit_checkbox = QCheckBox("Load in 4-bit")
+        self.accelerate4bit_checkbox.setToolTip("Load the model with 4-bit precision (using bitsandbytes).")
+        self.accelerate4bit_checkbox.setVisible(False)
+        layout.addWidget(self.accelerate4bit_checkbox, 81 + (len(gpu_stats) * 2), 0)
+
+        # Compute type horizontal layout
+        compute_type_layout = QHBoxLayout()
+
+        # Compute type label
+        self.accelerate4bit_compute_type_label = QLabel("Compute Type:")
+        self.accelerate4bit_compute_type_label.setToolTip("The compute type to use for 4-bit acceleration.")
+        self.accelerate4bit_compute_type_label.setVisible(False)
+        compute_type_layout.addWidget(self.accelerate4bit_compute_type_label)
+
+        # Compute type dropdown
+        self.accelerate4bit_compute_type_dropdown = QComboBox()
+        self.accelerate4bit_compute_type_dropdown.setToolTip("The compute type to use for 4-bit acceleration.")
+        self.accelerate4bit_compute_type_dropdown.setVisible(False)
+        self.accelerate4bit_compute_type_dropdown.addItems([ "none", "bfloat16", "float16", "float32"])
+        compute_type_layout.addWidget(self.accelerate4bit_compute_type_dropdown)
+        layout.addLayout(compute_type_layout, 81 + (len(gpu_stats) * 2), 1)
+
+        # Quant Type Horizontal Box
+        quant_type_layout = QHBoxLayout()
+
+        # Quant type label
+        self.accelerate4bit_quant_type_label = QLabel("Quant Type:")
+        self.accelerate4bit_quant_type_label.setToolTip("The quantization type to use for 4-bit acceleration.")
+        self.accelerate4bit_quant_type_label.setVisible(False)
+        quant_type_layout.addWidget(self.accelerate4bit_quant_type_label)
+
+        # Quant type Dropdown
+        self.accelerate4bit_quant_type_dropdown = QComboBox()
+        self.accelerate4bit_quant_type_dropdown.setToolTip("The quantization type to use for 4-bit acceleration.")
+        self.accelerate4bit_quant_type_dropdown.setVisible(False)
+        self.accelerate4bit_quant_type_dropdown.addItems([ "none", "nf4", "fp4"])
+        quant_type_layout.addWidget(self.accelerate4bit_quant_type_dropdown)
+        layout.addLayout(quant_type_layout, 82 + (len(gpu_stats) * 2), 1)
+
+        # Use double quant checkbox
+        self.accelerate4bit_double_quant_checkbox = QCheckBox("Use Double Quant")
+        self.accelerate4bit_double_quant_checkbox.setToolTip("Use double quantization for 4-bit acceleration.")
+        self.accelerate4bit_double_quant_checkbox.setVisible(False)
+        layout.addWidget(self.accelerate4bit_double_quant_checkbox, 82 + (len(gpu_stats) * 2), 0)
+
+        # Seperator for the Toolbox Options
         self.toolboxendline = QFrame()
         self.toolboxendline.setFrameShape(QFrame.HLine)
         self.toolboxendline.setFrameShadow(QFrame.Sunken)
         self.toolboxendline.setVisible(False)
-        layout.addWidget(self.toolboxendline, 75 + (len(gpu_stats) * 2), 0, 1, 3)
+        layout.addWidget(self.toolboxendline, 84 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # Authentication Box
         authentication_box = QHBoxLayout()
@@ -931,7 +1068,7 @@ class MainWindow(QMainWindow):
         self.choose_file_button.setToolTip("Choose a file to use for the authentication credentials. Credentials should be saved like:\nUSERNAME1:PASSWORD1\nUSERNAME2:PASSWORD2")
         self.choose_file_button.clicked.connect(self.on_choose_file_button_clicked)
         authentication_box.addWidget(self.choose_file_button)
-        layout.addLayout(authentication_box, 80 + (len(gpu_stats) * 2), 0, 1, 3)
+        layout.addLayout(authentication_box, 85 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # Extensions Selection Menu
         self.use_extensions_checkbox = QCheckBox("Use Extensions")
@@ -1039,6 +1176,16 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
 
+    def on_Accelerate_settings_checkbox_stateChanged(self, state):
+        self.accelerate4bit_header.setVisible(state == Qt.Checked)
+        self.accelerate4bit_checkbox.setVisible(state == Qt.Checked)
+        self.accelerate4bit_compute_type_label.setVisible(state == Qt.Checked)
+        self.accelerate4bit_compute_type_dropdown.setVisible(state == Qt.Checked)
+        self.accelerate4bit_quant_type_label.setVisible(state == Qt.Checked)
+        self.accelerate4bit_quant_type_dropdown.setVisible(state == Qt.Checked)
+        self.accelerate4bit_double_quant_checkbox.setVisible(state == Qt.Checked)
+        self.toolboxendline.setVisible(state == Qt.Checked)
+
     def on_api_public_checkbox_changed(self, state):
         self.api_streaming_port_SpinBox.setEnabled(False)
         self.api_blocking_port_SpinBox.setEnabled(False)
@@ -1059,7 +1206,7 @@ class MainWindow(QMainWindow):
         self.api_streaming_port_checkbox.setVisible(state == Qt.Checked)
         self.api_streaming_port_SpinBox.setVisible(state == Qt.Checked)
         self.api_public_checkbox.setVisible(state == Qt.Checked)
-        self.toolboxendline.setVisible(state == Qt.Checked)
+        self.toolboxapiline.setVisible(state == Qt.Checked)
 
     def on_rwkv_settings_checkbox_stateChanged(self, state):
         self.rwkv_header.setVisible(state == Qt.Checked)
@@ -1084,8 +1231,6 @@ class MainWindow(QMainWindow):
         self.flexgen_pin_weight_label.setVisible(state == Qt.Checked)
         self.flexgen_pin_weight_dropdown.setVisible(state == Qt.Checked)
         self.flexline.setVisible(state == Qt.Checked)
-        #self.flexgen_line.setVisible(state == Qt.Checked)
-        #self.flexgen_line.setVisible(state == Qt.Checked)
 
     def on_llama_settings_checkbox_stateChanged(self, state):
         self.llama_label_header.setVisible(state == Qt.Checked)
@@ -1599,6 +1744,21 @@ class MainWindow(QMainWindow):
         if self.use_quant_checkbox.isChecked():
             command += " --quant_attn"
 
+        # Accelerate 4-bit
+
+        # 4-bit usage
+        if self.accelerate4bit_checkbox.isChecked():
+            command += " --load-in-4bit"
+
+        if self.accelerate4bit_compute_type_dropdown != "none":
+            command += f" --compute_dtype {self.accelerate4bit_compute_type_dropdown.currentText()}"
+
+        if self.accelerate4bit_quant_type_dropdown != "none":
+            command += f" --quant_type {self.accelerate4bit_quant_type_dropdown.currentText()}"
+
+        if self.accelerate4bit_double_quant_checkbox.isChecked():
+            command += " --use_double_quant"
+
         # Disable Cache
         if self.use_nocache_checkbox.isChecked():
             command += " --no-cache"
@@ -1645,6 +1805,7 @@ class MainWindow(QMainWindow):
         # If AutoGPTQ is checked
         if self.use_autogptq_checkbox.isChecked():
             command += " --autogptq"
+            run_cmd_with_conda("pip install auto_gptq && exit")
 
         # If triton is checked
         if self.use_triton_checkbox.isChecked():
@@ -1667,7 +1828,7 @@ class MainWindow(QMainWindow):
                 command += f" --api-streaming-port {self.api_streaming_port_SpinBox.text()}"
 
         # Just for debugging.
-        #print(f"Command generated: python webuiGUI.py {command}")
+        print(f"Command generated: python webuiGUI.py {command}")
 
         # Based on the Model that's chosen, we will take care of some necessary stuff.
         # Starts the webui in the conda env with the user given Options
@@ -1686,7 +1847,10 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", message)
 
         if not self.deepspeed_checkbox.isChecked():
-            run_cmd_with_conda(f"python webuiGUI.py {command}")
+            if self.use_8bit_checkbox.isChecked():
+                run_cmd_with_conda(f"pip install accelerate && python webuiGUI.py {command}")
+            else:
+                run_cmd_with_conda(f"python webuiGUI.py {command}")
 
         if self.use_autoclose_checkbox.isChecked():
             sys.exit()
