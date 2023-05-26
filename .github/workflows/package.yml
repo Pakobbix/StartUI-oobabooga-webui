@@ -28,11 +28,10 @@ jobs:
 
       - name: Build and package
         run: |
-          pyinstaller --noconfirm --onefile --windowed StartUI.py
-          cp webuiGUI.py dist/  # Copy webuiGUI.py to the dist directory
+          pyinstaller --noconfirm --onefile --windowed StartUI.py --add-data "./webuiGUI.py;."
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.os }}-binary-v1.5.1
+          name: ${{ matrix.os }}-binary-v1.6
           path: dist
