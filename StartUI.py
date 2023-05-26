@@ -312,7 +312,7 @@ class MainWindow(QMainWindow):
 
         # Interface Mode Dropdown
         self.mode_dropdown = QComboBox()
-        self.mode_dropdown.addItems(["chat", "cai_chat", "notebook"])
+        self.mode_dropdown.addItems(["chat", "notebook"])
         self.mode_dropdown.setToolTip("Choose what kind of Interface you want to load.")
         interface_mode_box.addWidget(self.mode_dropdown)
         layout.addLayout(interface_mode_box, 3, 0)
@@ -742,12 +742,49 @@ class MainWindow(QMainWindow):
         self.llama_gpu_layer_box.addWidget(self.llama_gpu_layer_spinbox)
         layout.addLayout(self.llama_gpu_layer_box, 45 + (len(gpu_stats) * 2), 1, 1, 2)
 
+        # llama.cpp n_ctx inner layout
+        llama_n_ctx_inner_layout = QHBoxLayout()
+
+        # llama.cpp n_ctx label
+        self.llama_n_ctx_label = QLabel("n_ctx:")
+        self.llama_n_ctx_label.setVisible(False)
+        self.llama_n_ctx_label.setToolTip("Size of the prompt context.")
+        llama_n_ctx_inner_layout.addWidget(self.llama_n_ctx_label)
+
+        # llama.cpp n_ctx size dropdown
+        self.llama_n_ctx_dropdown = QComboBox()
+        self.llama_n_ctx_dropdown.setToolTip("Size of the prompt context.")
+        self.llama_n_ctx_dropdown.addItems(["128", "256", "512", "1024", "2048", "4096", "8192"])
+        self.llama_n_ctx_dropdown.setCurrentIndex(4)
+        self.llama_n_ctx_dropdown.setVisible(False)
+        llama_n_ctx_inner_layout.addWidget(self.llama_n_ctx_dropdown)
+        layout.addLayout(llama_n_ctx_inner_layout, 46 + (len(gpu_stats) * 2), 0)
+
+        # llama.cpp seed layout
+        llama_seed_inner_layout = QHBoxLayout()
+
+        # llama.cpp seed label
+        self.llama_seed_label = QLabel("Seed:")
+        self.llama_seed_label.setVisible(False)
+        self.llama_seed_label.setToolTip("Seed for llama-cpp models. Default 0 (random).")
+        llama_seed_inner_layout.addWidget(self.llama_seed_label)
+
+        # llama.cpp seed spinbox
+        self.llama_seed_spinbox = QSpinBox()
+        self.llama_seed_spinbox.setToolTip("Seed for llama-cpp models. Default 0 (random).")
+        self.llama_seed_spinbox.setRange(0, 2147483647)
+        self.llama_seed_spinbox.setValue(0)
+        self.llama_seed_spinbox.setSingleStep(1)
+        self.llama_seed_spinbox.setVisible(False)
+        llama_seed_inner_layout.addWidget(self.llama_seed_spinbox)
+        layout.addLayout(llama_seed_inner_layout, 46 + (len(gpu_stats) * 2), 1, 1, 2)
+
         # Seperator for the Toolbox Options
         self.llama_line = QFrame()
         self.llama_line.setFrameShape(QFrame.HLine)
         self.llama_line.setFrameShadow(QFrame.Sunken)
         self.llama_line.setVisible(False)
-        layout.addWidget(self.llama_line, 46 + (len(gpu_stats) * 2), 0, 1, 3)
+        layout.addWidget(self.llama_line, 49 + (len(gpu_stats) * 2), 0, 1, 3)
 
         ########################################
         #  _____ _            ____             #
@@ -1251,6 +1288,10 @@ class MainWindow(QMainWindow):
         self.llama_gpu_layer_label.setVisible(state == Qt.Checked)
         self.llama_gpu_layer_spinbox.setVisible(state == Qt.Checked)
         self.llama_cache_capacity_units.setVisible(state == Qt.Checked)
+        self.llama_n_ctx_label.setVisible(state == Qt.Checked)
+        self.llama_n_ctx_dropdown.setVisible(state == Qt.Checked)
+        self.llama_seed_label.setVisible(state == Qt.Checked)
+        self.llama_seed_spinbox.setVisible(state == Qt.Checked)
 
     def on_deepspeed_nvme_button_clicked(self):
         folder = QFileDialog.getExistingDirectory(self, "Offload Directory")
@@ -1557,6 +1598,8 @@ class MainWindow(QMainWindow):
             "llama_cache_capacity": self.llama_cache_capacity_spinbox.value(), # Saves the state of the llama_cache_capacity_spinbox
             "llama_cache_units": self.llama_cache_capacity_units.currentText(), # Saves the state of the llama_cache_capacity_units
             "llama_gpu_layer": self.llama_gpu_layer_spinbox.value(), # Saves the state of the llama_gpu_layer_spinbox
+            "llama_n_ctx": self.llama_n_ctx_dropdown.currentText(), # Saves the state of the llama_n_ctx_dropdown
+            "llama_seed": self.llama_seed_spinbox.value(), # Saves the state of the llama_seed_spinbox
             "flexgen_settings": self.flexgen_settings_checkbox.isChecked(), # Saves the state of the flexgen_settings_checkbox
             "use_flexgen": self.flexgen_checkbox.isChecked(), # Saves the state of the flexgen_checkbox
             "flexgen_precentage_1": self.flexgen_percentage_spinbox1.value(), # Saves the state of the flexgen_percentage_spinbox1
@@ -1631,6 +1674,8 @@ class MainWindow(QMainWindow):
             command += f" --threads {self.llama_threads_spinbox.value()}"
             command += f" --n_batch {self.llama_batch_size_spinbox.value()}"
             command += f" --cache-capacity {self.llama_cache_capacity_spinbox.value()}{self.llama_cache_capacity_units.currentText()}"
+            command += f" --n_ctx {self.llama_n_ctx_dropdown.currentText()}"
+            command += f" --llama_cpp_seed {self.llama_seed_spinbox.value()}"
 
         if self.llama_gpu_layer_spinbox.value() != 0:
             command += f" --n-gpu-layers {self.llama_gpu_layer_spinbox.value()}"
@@ -1911,11 +1956,13 @@ class MainWindow(QMainWindow):
         self.use_sdp_attention_checkbox.setChecked(settings.get("sdp_attention", False))
         self.use_autogptq_checkbox.setChecked(settings.get("autogptq", False))
         self.use_triton_checkbox.setChecked(settings.get("triton", False))
+        # Acceleration 4bit
         self.Accelerate_settings_checkbox.setChecked(settings.get("acceleration", False))
         self.accelerate4bit_checkbox.setChecked(settings.get("use_4bit", False))
         self.accelerate4bit_compute_type_dropdown.setCurrentText(settings.get("compute_dtype", ""))
         self.accelerate4bit_quant_type_dropdown.setCurrentText(settings.get("quant_type", ""))
         self.accelerate4bit_double_quant_checkbox.setChecked(settings.get("use_x2_quant", False))
+        # Deepspeed
         self.deepspeed_settings_checkbox.setChecked(settings.get("deepspeed", False))
         self.deepspeed_checkbox.setChecked(settings.get("deepspeed_enabled", False))
         self.deepspeed_gpu_num_spinbox.setValue(int(settings.get("deepspeed_gpu_num", 0)))
@@ -1923,6 +1970,7 @@ class MainWindow(QMainWindow):
         self.deepspeed_nvme_current_label.setText(f"Current Directory Folder: {self.selected_offload_directory}")
         self.deepspeed_nvme_checkbox.setChecked(settings.get("deepspeed_nvme_enabled", False))
         self.deepspeed_local_rank_spinbox.setValue(int(settings.get("deepspeed_local_rank", 0)))
+        # llama
         self.llama_settings_checkbox.setChecked(settings.get("llama_settings", False))
         self.llama_threads_spinbox.setValue(int(settings.get("llama_threads", 0)))
         self.llama_batch_size_spinbox.setValue(int(settings.get("llama_batch_size", 0)))
@@ -1931,6 +1979,9 @@ class MainWindow(QMainWindow):
         self.llama_cache_capacity_spinbox.setValue(int(settings.get("llama_cache_capacity", 0)))
         self.llama_cache_capacity_units.setCurrentText(settings.get("llama_cache_units", ""))
         self.llama_gpu_layer_spinbox.setValue(int(settings.get("llama_gpu_layer", 0)))
+        self.llama_n_ctx_dropdown.setCurrentText(settings.get("llama_n_ctx", ""))
+        self.llama_seed_spinbox.setValue(int(settings.get("llama_seed", 0)))
+        # flexgen
         self.flexgen_settings_checkbox.setChecked(settings.get("flexgen_settings", False))
         self.flexgen_checkbox.setChecked(settings.get("use_flexgen", False))
         self.flexgen_percentage_spinbox1.setValue(int(settings.get("flexgen_precentage_1", 0)))
@@ -1941,12 +1992,14 @@ class MainWindow(QMainWindow):
         self.flexgen_percentage_spinbox6.setValue(int(settings.get("flexgen_precentage_6", 0)))
         self.flexgen_compression_checkbox.setChecked(settings.get("flexgen_compression", False))
         self.flexgen_pin_weight_dropdown.setCurrentText(settings.get("flexgen_pin_weight", ""))
+        # RWKV
         self.rwkv_settings_checkbox.setChecked(settings.get("rwkv_settings", False))
         self.rwkv_checkbox.setChecked(settings.get("use_rwkv", False))
         self.rwkv_strategy_checkbox.setChecked(settings.get("rwkv_strategy", False))
         self.rwkv_strategy_dropdown.setCurrentText(settings.get("rwkv_strategy_dropdown", ""))
         self.rwkv_allocation_spinbox.setValue(int(settings.get("rwkv_allocation", 0)))
         self.rwkv_cuda_checkbox.setChecked(settings.get("rwkv_cuda", False))
+        # API
         self.api_settings_checkbox.setChecked(settings.get("api_settings", False))
         self.api_checkbox.setChecked(settings.get("use_api", False))
         self.api_blocking_port_checkbox.setChecked(settings.get("api_blocking_port_enabled", False))
