@@ -1,4 +1,4 @@
-import sys, os, gpustat, json, subprocess, platform, psutil, re, requests, darkdetect, qdarkstyle, time, git
+import sys, os, gpustat, json, subprocess, platform, psutil, re, requests, darkdetect, qdarkstyle, time
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QToolBar, QMessageBox, QAction, QMainWindow, QSpinBox, QLabel, QVBoxLayout, QComboBox, QSlider, QCheckBox, QLineEdit, QFileDialog, QPushButton, QWidget, QListWidget, QListWidgetItem, QGridLayout, QRadioButton, QFrame
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
@@ -91,7 +91,6 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.init_ui()
-        self.load_last_commit()
         self.load_settings()
         self.set_ram_slider_max()
         self.update_check()
@@ -421,21 +420,22 @@ class MainWindow(QMainWindow):
         self.pre_layer_slider_value = []
         self.pre_layer_amount_max = 100
         # Don't get confused. With the latest changes, each GPU can have it's own pre_layer value. So we check again gpu_stats for the amount.
-        for i, gpu in enumerate(gpu_stats):
-            pre_layer_labels = QLabel(f"{gpu.name} Pre_Layer:")
-            pre_layer_labels.setToolTip(f"The number of layers to allocate to the GPU.\nSetting this parameter enables CPU offloading for 4-bit models.\nFor multi-gpu, write the numbers separated by spaces, eg --pre_layer 30 60.")
-            layout.addWidget(pre_layer_labels, 11 + (len(gpu_stats) * 2) + i, 0)
-            self.pre_layer_labels.append(pre_layer_labels)
+        if nvidia_gpu:
+            for i, gpu in enumerate(gpu_stats):
+                pre_layer_labels = QLabel(f"{gpu.name} Pre_Layer:")
+                pre_layer_labels.setToolTip(f"The number of layers to allocate to the GPU.\nSetting this parameter enables CPU offloading for 4-bit models.\nFor multi-gpu, write the numbers separated by spaces, eg --pre_layer 30 60.")
+                layout.addWidget(pre_layer_labels, 11 + (len(gpu_stats) * 2) + i, 0)
+                self.pre_layer_labels.append(pre_layer_labels)
 
-            pre_layer_sliders = QSlider(Qt.Horizontal)
-            pre_layer_sliders.setMaximum(100)
-            pre_layer_sliders.valueChanged.connect(lambda value, idx=i: self.on_pre_layer_slider_changed(value, idx))
-            layout.addWidget(pre_layer_sliders, 11 + (len(gpu_stats) * 2) + i, 1)
-            self.pre_layer_slider.append(pre_layer_sliders)
+                pre_layer_sliders = QSlider(Qt.Horizontal)
+                pre_layer_sliders.setMaximum(100)
+                pre_layer_sliders.valueChanged.connect(lambda value, idx=i: self.on_pre_layer_slider_changed(value, idx))
+                layout.addWidget(pre_layer_sliders, 11 + (len(gpu_stats) * 2) + i, 1)
+                self.pre_layer_slider.append(pre_layer_sliders)
 
-            pre_layer_sliders_value = QLabel("0")
-            layout.addWidget(pre_layer_sliders_value, 11 + (len(gpu_stats) * 2) + i, 2)
-            self.pre_layer_slider_value.append(pre_layer_sliders_value)
+                pre_layer_sliders_value = QLabel("0")
+                layout.addWidget(pre_layer_sliders_value, 11 + (len(gpu_stats) * 2) + i, 2)
+                self.pre_layer_slider_value.append(pre_layer_sliders_value)
 
         # Add horizontal line to seperate the Checkboxes
         line = QFrame()
@@ -451,7 +451,7 @@ class MainWindow(QMainWindow):
         # Deactivate Streaming Output
         self.use_nostream_checkbox = QCheckBox("No Stream")
         self.use_nostream_checkbox.setToolTip("Don't stream the text output in real time. Increases Token/s by ~ 50%")
-        layout.addWidget(self.use_nostream_checkbox, 15 + (len(gpu_stats) * 2), 1)
+        layout.addWidget(self.use_nostream_checkbox, 14 + (len(gpu_stats) * 2), 1)
 
         # Load in full 16bit precision
         self.use_16bit_checkbox = QCheckBox("Load in 16bit")
@@ -1921,29 +1921,6 @@ class MainWindow(QMainWindow):
         # Populate the profile name text field with the loaded profile name
         profile_name = selected_profile.replace(".json", "")
         self.profile_name_textfield.setText(profile_name)
-
-    def load_last_commit(self):
-        last_commit = os.path.join("./text-generation-webui/.git/ORIG_HEAD")
-        if os.path.exists(last_commit):
-            with open(last_commit, "r") as file:
-                last_commit_sha = file.read()
-                print(last_commit_sha)
-                try:
-                    current_commit = (self.get_current_commit_sha() + '\n')  # Call the method within the class
-                    print(current_commit)
-                    if current_commit != last_commit_sha:
-                        self.update_button.setVisible(True)
-                    else:
-                        self.update_button.setVisible(False)
-                except json.JSONDecodeError:
-                    pass
-
-    def get_current_commit_sha(self):
-        # Initialize the Git repository object
-        repo = git.Repo(repo_path)
-        # Get the current commit SHA
-        commit_sha = repo.head.object.hexsha
-        return commit_sha
 
     def apply_load_settings(self, settings):
         self.model_dropdown.setCurrentText(settings.get("model", ""))
