@@ -1,4 +1,4 @@
-import sys, os, gpustat, json, subprocess, platform, psutil, re, requests, darkdetect, qdarkstyle, time
+import sys, os, gpustat, json, subprocess, platform, psutil, re, requests, darkdetect, qdarkstyle, time, git
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QToolBar, QMessageBox, QAction, QMainWindow, QSpinBox, QLabel, QVBoxLayout, QComboBox, QSlider, QCheckBox, QLineEdit, QFileDialog, QPushButton, QWidget, QListWidget, QListWidgetItem, QGridLayout, QRadioButton, QFrame
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
@@ -11,6 +11,7 @@ profiles_folder = "./profiles"
 # Create the profile folder if it doesn't exist
 os.makedirs(profiles_folder, exist_ok=True)
 
+repo_path = "./text-generation-webui"
 model_folder = "./text-generation-webui/models"
 extensions_folder = "./text-generation-webui/extensions"
 loras_folder = "./text-generation-webui/loras"
@@ -90,6 +91,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.init_ui()
+        self.load_last_commit()
         self.load_settings()
         self.set_ram_slider_max()
         self.update_check()
@@ -221,6 +223,7 @@ class MainWindow(QMainWindow):
         # |_|  |_|\__,_|_|_| |_|    \_/\_/  |_|_| |_|\__,_|\___/ \_/\_/   #
         #                                                                 #
         ###################################################################
+        
         layout = QGridLayout()
         layout.setColumnMinimumWidth(0, 350)
         layout.setColumnMinimumWidth(3, 30)
@@ -1905,15 +1908,6 @@ class MainWindow(QMainWindow):
     def on_update_button_clicked(self):
         run_cmd_with_conda(f"python {webui_file} --update && exit")
 
-    def load_profile(self, profile_file):
-        with open(profile_file, "r") as file:
-            try:
-                settings = json.load(file)
-                # Set the GUI elements based on the loaded settings...
-            except json.JSONDecodeError:
-                # Handle the case when the file is empty or not in valid JSON format
-                pass
-    
     def populate_profiles_dropdown(self):
         self.profiles_dropdown.clear()
         profiles = [name for name in os.listdir(profiles_folder) if name.endswith(".json")]
@@ -1927,6 +1921,29 @@ class MainWindow(QMainWindow):
         # Populate the profile name text field with the loaded profile name
         profile_name = selected_profile.replace(".json", "")
         self.profile_name_textfield.setText(profile_name)
+
+    def load_last_commit(self):
+        last_commit = os.path.join("./text-generation-webui/.git/ORIG_HEAD")
+        if os.path.exists(last_commit):
+            with open(last_commit, "r") as file:
+                last_commit_sha = file.read()
+                print(last_commit_sha)
+                try:
+                    current_commit = (self.get_current_commit_sha() + '\n')  # Call the method within the class
+                    print(current_commit)
+                    if current_commit != last_commit_sha:
+                        self.update_button.setVisible(True)
+                    else:
+                        self.update_button.setVisible(False)
+                except json.JSONDecodeError:
+                    pass
+
+    def get_current_commit_sha(self):
+        # Initialize the Git repository object
+        repo = git.Repo(repo_path)
+        # Get the current commit SHA
+        commit_sha = repo.head.object.hexsha
+        return commit_sha
 
     def apply_load_settings(self, settings):
         self.model_dropdown.setCurrentText(settings.get("model", ""))
