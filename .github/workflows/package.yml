@@ -28,7 +28,7 @@ jobs:
 
       - name: Build and package
         run: |
-          pyinstaller --noconfirm --onefile --windowed StartUI.py --add-data "${{ github.workspace }}/webuiGUI.py,."
+          pyinstaller --noconfirm --onefile --windowed StartUI.py --add-data "${{ github.workspace }}/webuiGUI.py\;."
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
