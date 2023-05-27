@@ -41,7 +41,7 @@ jobs:
           else
             deactivate
           fi
-          rm -rf myenv
+          rm -rf StartUI_env
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
