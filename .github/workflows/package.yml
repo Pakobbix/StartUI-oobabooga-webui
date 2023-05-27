@@ -20,6 +20,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Create and activate venv
+        run: |
+          python -m venv StartUI_env
+          source StartUI_env/bin/activate
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -28,6 +33,11 @@ jobs:
 
       - name: Build and package
         run: pyinstaller --noconfirm --onefile --windowed StartUI.py --add-data="webuiGUI.py:."
+
+      - name: Leave venv and delete
+        run: |
+          deactivate
+          rm -rf StartUI_env
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
