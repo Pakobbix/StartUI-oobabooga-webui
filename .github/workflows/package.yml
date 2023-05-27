@@ -22,8 +22,12 @@ jobs:
 
       - name: Create and activate venv
         run: |
-          python -m venv StartUI_env
-          source StartUI_env/bin/activate
+            python -m venv StartUI_env
+            if [ "$RUNNER_OS" == "Windows" ]; then
+              StartUI_env\Scripts\activate.bat
+            else
+              source StartUI_env/bin/activate
+            fi
 
       - name: Install dependencies
         run: |
