@@ -27,8 +27,7 @@ jobs:
           pip install pyinstaller
 
       - name: Build and package
-        run: |
-          pyinstaller --noconfirm --onefile --windowed StartUI.py --add-data "webuiGUI.py:."
+        run: pyinstaller --noconfirm --onefile --windowed StartUI.py --add-data="webuiGUI.py:."
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
