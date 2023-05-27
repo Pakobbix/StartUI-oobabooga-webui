@@ -36,8 +36,12 @@ jobs:
 
       - name: Leave venv and delete
         run: |
-          deactivate
-          rm -rf StartUI_env
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            deactivate.bat
+          else
+            deactivate
+          fi
+          rm -rf myenv
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
