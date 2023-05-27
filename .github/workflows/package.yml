@@ -38,15 +38,6 @@ jobs:
       - name: Build and package
         run: pyinstaller --noconfirm --onefile --windowed StartUI.py --add-data="webuiGUI.py:."
 
-      - name: Leave venv and delete
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            deactivate.bat
-          else
-            deactivate
-          fi
-          rm -rf StartUI_env
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
