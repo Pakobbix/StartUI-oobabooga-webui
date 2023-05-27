@@ -22,8 +22,12 @@ jobs:
           
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get upgrade -y
+          sudo apt-get install patchelf -y
           pip install -r requirements.txt
           pip install nuitka
+          sudo apt install patchelf
 
       - name: Build and package
         run: python3 -m nuitka StartUI.py --onefile --enable-plugin=pyqt5 --product-version=1.6.0 --disable-console --include-data-files=webuiGUI.py=webuiGUI.py --output-dir=./dist --noinclude-pytest-mode=nofollow --noinclude-setuptools-mode=nofollow
