@@ -51,10 +51,16 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install nuitka
 
       - name: Build and package
-        run: pyinstaller --noconfirm --onefile --windowed StartUI.py --add-data="webuiGUI.py;."
+        run: nuitka StartUI.py --onefile --enable-plugin=pyqt5 --product-version=1.6.0 --disable-console --include-data-files=webuiGUI.py=webuiGUI.py --output-dir=./dist --noinclude-pytest-mode=nofollow --noinclude-setuptools-mode=nofollow
+
+      - name: remove build folders
+        run: |
+        rm -rf ./dist/StartUI.build
+        rm -rf ./dist/StartUI.dist
+        rm -rf ./dist/StartUI.onefile-build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
