@@ -58,9 +58,9 @@ jobs:
 
       - name: remove build folders
         run: |
-        rm -rf ./dist/StartUI.build
-        rm -rf ./dist/StartUI.dist
-        rm -rf ./dist/StartUI.onefile-build
+         rm -rf ./dist/StartUI.build
+         rm -rf ./dist/StartUI.dist
+         rm -rf ./dist/StartUI.onefile-build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
