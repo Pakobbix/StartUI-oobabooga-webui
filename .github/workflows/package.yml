@@ -21,22 +21,31 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Create and activate venv
+        run: python -m venv StartUI_env
+
+      - name: activate venv
         run: |
-            python -m venv StartUI_env
             if [ "$RUNNER_OS" == "Windows" ]; then
-              StartUI_env\Scripts\activate.bat
+              StartUI_env\Scripts\activate
             else
               source StartUI_env/bin/activate
             fi
 
+      - name: Upgrade Pip
+        run: python -m pip install --upgrade pip
+          
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Build and package
         run: pyinstaller --noconfirm --onefile --windowed StartUI.py --add-data="webuiGUI.py:."
+
+      - name: deactivate venv
+        run: deactivate
+
+      - name: delete venv
+        run: rm -rf StartUI_env
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
