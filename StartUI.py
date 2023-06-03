@@ -1,7 +1,8 @@
 import sys, os, gpustat, json, subprocess, platform, psutil, re, requests, darkdetect, qdarkstyle, time
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QToolBar, QMessageBox, QAction, QMainWindow, QSpinBox, QLabel, QVBoxLayout, QComboBox, QSlider, QCheckBox, QLineEdit, QFileDialog, QPushButton, QWidget, QListWidget, QListWidgetItem, QGridLayout, QRadioButton, QFrame
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
+from PyQt5.QtWidgets import QAction, QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton, QRadioButton, QSlider, QSpinBox, QToolBar, QVBoxLayout, QWidget
 
 # For showing the current version and checking for updates
 version = "1.6"
@@ -542,11 +543,16 @@ class MainWindow(QMainWindow):
         self.use_triton_checkbox.setToolTip("Use Triton for inference.")
         layout.addWidget(self.use_triton_checkbox, 22 + (len(gpu_stats) * 2), 1)
 
+        # Add desc_act option Checkbox
+        self.use_desc_act_checkbox = QCheckBox("Use desc_act")
+        self.use_desc_act_checkbox.setToolTip("For models that don\'t have a quantize_config.json, this parameter is used to define whether to set desc_act or not in BaseQuantizeConfig.")
+        layout.addWidget(self.use_desc_act_checkbox, 23 + (len(gpu_stats) * 2), 0)
+
         # Add horizontal line to seperate the Checkboxes
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(line, 23 + (len(gpu_stats) * 2), 0, 1, 3)
+        layout.addWidget(line, 29 + (len(gpu_stats) * 2), 0, 1, 3)
 
         # New GUI Options based on Toolbox Checkboxes.
 
@@ -1860,6 +1866,10 @@ class MainWindow(QMainWindow):
         # If triton is checked
         if self.use_triton_checkbox.isChecked():
             command += " --triton"
+
+        # if desc_act is checked
+        if self.use_desc_act_checkbox.isChecked():
+            command += " --desc_act"
 
         # Adds the chosen extensions to the list of the command.
         extensions = [self.extensions_list.item(i).text() for i in range(self.extensions_list.count()) if self.extensions_list.item(i).checkState() == Qt.Checked]
